@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kundenumfrage – eurotel</title>
+<style>
+  :root {
+    --blue-dark: #003366;
+    --blue-mid:  #005EB8;
+    --blue-acc:  #0085CA;
+    --blue-light:#E8F0F8;
+    --gray:      #6B7280;
+    --gray-light:#F3F4F6;
+    --white:     #ffffff;
+    --green:     #16A34A;
+    --border:    #E5E7EB;
+    --shadow:    0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F0F4F8; color: #1F2937; font-size: 14px; line-height: 1.5;
+    padding: 24px 14px 60px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  .header { background: var(--blue-dark); border-radius: 12px 12px 0 0; padding: 26px 28px; color: #fff; position: relative; overflow: hidden; }
+  .header::after { content:''; position:absolute; top:-40px; right:-40px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,.06); }
+  .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .header .sub { color: #93C5FD; font-size: 12.5px; }
+  .header .badge { display:inline-block; margin-top:12px; background: rgba(255,255,255,.12); color:#fff; padding:4px 12px; border-radius:20px; font-size:11.5px; font-weight:600; }
+
+  .intro { background: var(--white); padding: 22px 28px; border-bottom: 1px solid var(--border); }
+  .intro p { color: #374151; font-size: 13.5px; }
+  .intro p + p { margin-top: 8px; }
+
+  form { background: var(--white); border-radius: 0 0 12px 12px; box-shadow: var(--shadow-lg); }
+
+  .section { padding: 22px 28px; border-bottom: 1px solid var(--border); }
+  .section:last-of-type { border-bottom: none; }
+  .section-title { font-size: 14.5px; font-weight: 700; color: var(--blue-dark); margin-bottom: 3px; display:flex; align-items:center; gap:8px; }
+  .section-title .num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background: var(--blue-light); color: var(--blue-mid); font-size: 11.5px; font-weight:700; flex-shrink:0; }
+  .section-hint { color: var(--gray); font-size: 12px; margin-bottom: 16px; margin-left: 30px; }
+
+  .q { margin-bottom: 18px; margin-left: 30px; }
+  .q:last-child { margin-bottom: 0; }
+  .q label.qlabel { display:block; font-weight:600; font-size: 13px; color:#1F2937; margin-bottom: 9px; }
+  .q label.qlabel .opt { font-weight: 400; color: var(--gray); font-size: 11.5px; }
+
+  /* Skalen (1-5) */
+  .scale { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .scale input { display:none; }
+  .scale .opt-btn { min-width: 42px; height:42px; border:1.5px solid var(--border); border-radius:9px;
+                     display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:700;
+                     color: var(--gray); transition: all .15s; font-size:13.5px; padding: 0 6px; }
+  .scale .opt-btn:hover { border-color: var(--blue-acc); color: var(--blue-mid); }
+  .scale input:checked + .opt-btn { background: var(--blue-mid); border-color: var(--blue-mid); color:#fff; }
+  .scale-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--gray); margin-top:6px; max-width: 320px; }
+  .nps-row { display:flex; gap:6px; flex-wrap:wrap; }
+  .nps-row .opt-btn { min-width: 34px; height:34px; font-size:12.5px; }
+
+  /* Ja/Nein */
+  .yesno { display:flex; gap:10px; }
+  .yesno input { display:none; }
+  .yesno .opt-btn { padding: 8px 18px; border:1.5px solid var(--border); border-radius:8px; cursor:pointer; font-weight:600; color:var(--gray); font-size:13px; transition: all .15s; }
+  .yesno .opt-btn:hover { border-color: var(--blue-acc); color: var(--blue-mid); }
+  .yesno input:checked + .opt-btn { background: var(--blue-mid); border-color: var(--blue-mid); color:#fff; }
+
+  /* Checkbox-Chips */
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips input { display:none; }
+  .chips .chip { padding: 8px 14px; border:1.5px solid var(--border); border-radius:20px; cursor:pointer; font-size:12.5px; color:#374151; transition: all .15s; }
+  .chips .chip:hover { border-color: var(--blue-acc); }
+  .chips input:checked + .chip { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue-mid); font-weight:600; }
+
+  textarea, input[type=text], input[type=email] {
+    width:100%; border:1.5px solid var(--border); border-radius:8px; padding:10px 12px;
+    font-size:13.5px; font-family:inherit; color:#1F2937; resize:vertical;
+  }
+  textarea:focus, input:focus { outline:none; border-color: var(--blue-acc); }
+  .two-col-inputs { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:520px) { .two-col-inputs { grid-template-columns:1fr; } }
+
+  .footer-actions { padding: 24px 28px 28px; text-align:center; }
+  .btn-submit {
+    background: var(--blue-mid); color:#fff; border:none; border-radius:9px; padding:13px 40px;
+    font-size:14.5px; font-weight:700; cursor:pointer; box-shadow: var(--shadow); transition: background .15s;
+  }
+  .btn-submit:hover { background: var(--blue-dark); }
+  .footer-note { color: var(--gray); font-size:11.5px; margin-top:12px; }
+
+  .required-mark { color:#DC2626; }
+
+  /* Danke-Ansicht */
+  #thanks { display:none; background:var(--white); border-radius:12px; box-shadow: var(--shadow-lg); padding:40px 28px; text-align:center; }
+  #thanks .check { width:56px; height:56px; border-radius:50%; background:#F0FDF4; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+  #thanks h2 { color: var(--blue-dark); font-size:19px; margin-bottom:8px; }
+  #thanks p { color:#374151; font-size:13.5px; max-width:440px; margin:0 auto; }
+  #thanks .fallback { margin-top:22px; text-align:left; background:var(--gray-light); border-radius:9px; padding:16px; display:none; }
+  #thanks .fallback.show { display:block; }
+  #thanks .fallback p.hint { color:var(--gray); font-size:12px; margin-bottom:8px; }
+  #thanks textarea { min-height:160px; font-size:12px; background:#fff; }
+  #thanks .copy-row { display:flex; gap:10px; margin-top:10px; }
+  .btn-secondary { background:var(--white); color:var(--blue-mid); border:1.5px solid var(--blue-mid); border-radius:8px; padding:8px 16px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .btn-secondary:hover { background: var(--blue-light); }
+
+  .page-footer { text-align:center; color:var(--gray); font-size:11.5px; margin-top:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="survey-view">
+    <div class="header">
+      <h1>🌐 Kundenumfrage – eurotel</h1>
+      <div class="sub">Autorisierter Webfleet-Partner</div>
+      <span class="badge">⏱️ dauert nur ca. 3 Minuten</span>
+    </div>
+    <div class="intro">
+      <p>Vielen Dank, dass Sie sich einen Moment Zeit nehmen! Ihre Meinung hilft uns, unseren Service, unsere Produkte und unsere Zusammenarbeit stetig zu verbessern.</p>
+      <p>Am Ende bitten wir Sie um Ihre Kontaktdaten, damit wir bei Rückfragen auf Sie zukommen können.</p>
+    </div>
+
+    <form id="survey-form" onsubmit="return submitSurvey(event)">
+
+      <!-- 1: Allgemeine Zufriedenheit -->
+      <div class="section">
+        <div class="section-title"><span class="num">1</span> Allgemeine Zufriedenheit</div>
+        <div class="section-hint">Wie zufrieden sind Sie insgesamt mit eurotel?</div>
+        <div class="q">
+          <label class="qlabel">Gesamtzufriedenheit <span class="required-mark">*</span></label>
+          <div class="scale" data-required="true" data-name="gesamtzufriedenheit">
+            <input type="radio" name="gesamtzufriedenheit" id="gz1" value="1"><label class="opt-btn" for="gz1">1</label>
+            <input type="radio" name="gesamtzufriedenheit" id="gz2" value="2"><label class="opt-btn" for="gz2">2</label>
+            <input type="radio" name="gesamtzufriedenheit" id="gz3" value="3"><label class="opt-btn" for="gz3">3</label>
+            <input type="radio" name="gesamtzufriedenheit" id="gz4" value="4"><label class="opt-btn" for="gz4">4</label>
+            <input type="radio" name="gesamtzufriedenheit" id="gz5" value="5"><label class="opt-btn" for="gz5">5</label>
+          </div>
+          <div class="scale-labels"><span>sehr unzufrieden</span><span>sehr zufrieden</span></div>
+        </div>
+      </div>
+
+      <!-- 2: Software / WEBFLEET -->
+      <div class="section">
+        <div class="section-title"><span class="num">2</span> Software &amp; WEBFLEET</div>
+        <div class="section-hint">Nutzung der Plattform und mobilen App</div>
+        <div class="q">
+          <label class="qlabel">Wie einfach ist die Bedienung von WEBFLEET?</label>
+          <div class="scale" data-name="webfleet_bedienung">
+            <input type="radio" name="webfleet_bedienung" id="mb1" value="1"><label class="opt-btn" for="mb1">1</label>
+            <input type="radio" name="webfleet_bedienung" id="mb2" value="2"><label class="opt-btn" for="mb2">2</label>
+            <input type="radio" name="webfleet_bedienung" id="mb3" value="3"><label class="opt-btn" for="mb3">3</label>
+            <input type="radio" name="webfleet_bedienung" id="mb4" value="4"><label class="opt-btn" for="mb4">4</label>
+            <input type="radio" name="webfleet_bedienung" id="mb5" value="5"><label class="opt-btn" for="mb5">5</label>
+          </div>
+          <div class="scale-labels"><span>kompliziert</span><span>sehr einfach</span></div>
+        </div>
+        <div class="q">
+          <label class="qlabel">Nutzen Sie die mobile App (WEBFLEET Mobile)?</label>
+          <div class="yesno">
+            <input type="radio" name="app_nutzung" id="app-ja" value="Ja"><label class="opt-btn" for="app-ja">Ja</label>
+            <input type="radio" name="app_nutzung" id="app-nein" value="Nein"><label class="opt-btn" for="app-nein">Nein</label>
+          </div>
+        </div>
+        <div class="q">
+          <label class="qlabel">Welche Funktionen nutzen Sie am meisten? <span class="opt">(Mehrfachauswahl)</span></label>
+          <div class="chips">
+            <input type="checkbox" id="fn1" value="Fahrzeugortung" name="funktionen"><label class="chip" for="fn1">Fahrzeugortung</label>
+            <input type="checkbox" id="fn2" value="Berichte/Reporting" name="funktionen"><label class="chip" for="fn2">Berichte / Reporting</label>
+            <input type="checkbox" id="fn3" value="Fahrerverhalten" name="funktionen"><label class="chip" for="fn3">Fahrerverhalten</label>
+            <input type="checkbox" id="fn4" value="Wartungsplanung" name="funktionen"><label class="chip" for="fn4">Wartungsplanung</label>
+            <input type="checkbox" id="fn5" value="Kraftstoffmanagement" name="funktionen"><label class="chip" for="fn5">Kraftstoffmanagement</label>
+            <input type="checkbox" id="fn6" value="Sonstiges" name="funktionen"><label class="chip" for="fn6">Sonstiges</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3: Support -->
+      <div class="section">
+        <div class="section-title"><span class="num">3</span> Support &amp; Kundenservice</div>
+        <div class="q">
+          <label class="qlabel">Reaktionszeit bei Anfragen</label>
+          <div class="scale" data-name="support_reaktionszeit">
+            <input type="radio" name="support_reaktionszeit" id="sr1" value="1"><label class="opt-btn" for="sr1">1</label>
+            <input type="radio" name="support_reaktionszeit" id="sr2" value="2"><label class="opt-btn" for="sr2">2</label>
+            <input type="radio" name="support_reaktionszeit" id="sr3" value="3"><label class="opt-btn" for="sr3">3</label>
+            <input type="radio" name="support_reaktionszeit" id="sr4" value="4"><label class="opt-btn" for="sr4">4</label>
+            <input type="radio" name="support_reaktionszeit" id="sr5" value="5"><label class="opt-btn" for="sr5">5</label>
+          </div>
+          <div class="scale-labels"><span>langsam</span><span>sehr schnell</span></div>
+        </div>
+        <div class="q">
+          <label class="qlabel">Freundlichkeit &amp; Kompetenz des Support-Teams</label>
+          <div class="scale" data-name="support_kompetenz">
+            <input type="radio" name="support_kompetenz" id="sk1" value="1"><label class="opt-btn" for="sk1">1</label>
+            <input type="radio" name="support_kompetenz" id="sk2" value="2"><label class="opt-btn" for="sk2">2</label>
+            <input type="radio" name="support_kompetenz" id="sk3" value="3"><label class="opt-btn" for="sk3">3</label>
+            <input type="radio" name="support_kompetenz" id="sk4" value="4"><label class="opt-btn" for="sk4">4</label>
+            <input type="radio" name="support_kompetenz" id="sk5" value="5"><label class="opt-btn" for="sk5">5</label>
+          </div>
+          <div class="scale-labels"><span>schlecht</span><span>sehr gut</span></div>
+        </div>
+      </div>
+
+      <!-- 4: Zusatzleistungen -->
+      <div class="section">
+        <div class="section-title"><span class="num">4</span> Zusatzleistungen &amp; Interesse</div>
+        <div class="q">
+          <label class="qlabel">An welchen weiteren Produkten/Leistungen hätten Sie Interesse? <span class="opt">(Mehrfachauswahl)</span></label>
+          <div class="chips">
+            <input type="checkbox" id="zl1" value="Dashcams" name="zusatzleistungen"><label class="chip" for="zl1">Dashcams</label>
+            <input type="checkbox" id="zl2" value="Kraftstoffmanagement" name="zusatzleistungen"><label class="chip" for="zl2">Kraftstoffmanagement</label>
+            <input type="checkbox" id="zl3" value="E-Fahrzeug-Integration" name="zusatzleistungen"><label class="chip" for="zl3">E-Fahrzeug-Integration</label>
+            <input type="checkbox" id="zl4" value="Schulungen" name="zusatzleistungen"><label class="chip" for="zl4">Schulungen</label>
+            <input type="checkbox" id="zl5" value="Weitere Fahrzeugtracker" name="zusatzleistungen"><label class="chip" for="zl5">Weitere Fahrzeugtracker</label>
+            <input type="checkbox" id="zl6" value="Add-Ins/Erweiterungen" name="zusatzleistungen"><label class="chip" for="zl6">Add-Ins / Erweiterungen</label>
+            <input type="checkbox" id="zl7" value="Kein Interesse" name="zusatzleistungen"><label class="chip" for="zl7">Kein Interesse aktuell</label>
+          </div>
+        </div>
+        <div class="q">
+          <label class="qlabel">An welchen Punkten suchen Sie aktuell noch nach einer Lösung?</label>
+          <textarea id="loesungssuche" name="loesungssuche" rows="3" placeholder="z. B. offene Herausforderungen im Fuhrpark, für die Sie noch keine passende Lösung gefunden haben …"></textarea>
+        </div>
+      </div>
+
+      <!-- 5: Weiterempfehlung -->
+      <div class="section">
+        <div class="section-title"><span class="num">5</span> Weiterempfehlung</div>
+        <div class="q">
+          <label class="qlabel">Wie wahrscheinlich ist es, dass Sie eurotel weiterempfehlen? <span class="required-mark">*</span></label>
+          <div class="scale nps-row" data-required="true" data-name="nps">
+            <input type="radio" name="nps" id="nps0" value="0"><label class="opt-btn" for="nps0">0</label>
+            <input type="radio" name="nps" id="nps1" value="1"><label class="opt-btn" for="nps1">1</label>
+            <input type="radio" name="nps" id="nps2" value="2"><label class="opt-btn" for="nps2">2</label>
+            <input type="radio" name="nps" id="nps3" value="3"><label class="opt-btn" for="nps3">3</label>
+            <input type="radio" name="nps" id="nps4" value="4"><label class="opt-btn" for="nps4">4</label>
+            <input type="radio" name="nps" id="nps5" value="5"><label class="opt-btn" for="nps5">5</label>
+            <input type="radio" name="nps" id="nps6" value="6"><label class="opt-btn" for="nps6">6</label>
+            <input type="radio" name="nps" id="nps7" value="7"><label class="opt-btn" for="nps7">7</label>
+            <input type="radio" name="nps" id="nps8" value="8"><label class="opt-btn" for="nps8">8</label>
+            <input type="radio" name="nps" id="nps9" value="9"><label class="opt-btn" for="nps9">9</label>
+            <input type="radio" name="nps" id="nps10" value="10"><label class="opt-btn" for="nps10">10</label>
+          </div>
+          <div class="scale-labels" style="max-width:100%"><span>0 = sehr unwahrscheinlich</span><span>10 = sehr wahrscheinlich</span></div>
+        </div>
+      </div>
+
+      <!-- 6: Freitext -->
+      <div class="section">
+        <div class="section-title"><span class="num">6</span> Ihr Feedback</div>
+        <div class="q">
+          <label class="qlabel">Was können wir verbessern? Haben Sie sonstige Anmerkungen?</label>
+          <textarea id="freitext" name="freitext" rows="4" placeholder="Ihre Meinung ist uns wichtig …"></textarea>
+        </div>
+      </div>
+
+      <!-- 7: Kontakt -->
+      <div class="section">
+        <div class="section-title"><span class="num">7</span> Kontaktdaten <span class="required-mark">*</span></div>
+        <div class="section-hint">Damit wir bei Rückfragen auf Sie zukommen können</div>
+        <div class="q">
+          <div class="two-col-inputs">
+            <input type="text" id="kontakt-firma" placeholder="Unternehmen *" required>
+            <input type="text" id="kontakt-name" placeholder="Ansprechpartner *" required>
+          </div>
+          <div style="margin-top:10px">
+            <input type="email" id="kontakt-email" placeholder="E-Mail *" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-actions">
+        <button type="submit" class="btn-submit">Umfrage absenden</button>
+        <div class="footer-note">Ihre Antworten werden direkt an eurotel übermittelt.</div>
+      </div>
+    </form>
+  </div>
+
+  <div id="thanks">
+    <div class="check">
+      <svg width="28" height="28" fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <h2>Vielen Dank für Ihr Feedback!</h2>
+    <p id="thanks-text">Ihre Antworten wurden übermittelt.</p>
+    <div class="fallback" id="fallback-box">
+      <p class="hint">Antworten als Text (zum manuellen Versand):</p>
+      <textarea id="fallback-text" readonly></textarea>
+      <div class="copy-row">
+        <button type="button" class="btn-secondary" onclick="copyFallback()">📋 Text kopieren</button>
+        <button type="button" class="btn-secondary" onclick="mailtoAgain()">✉️ E-Mail-Programm erneut öffnen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">eurotel GmbH & Co. KG · Schulstraße 3 · 56291 Bickenbach · [E-Mail eintragen] · [Telefon eintragen]</div>
+</div>
+
+<script>
+const SURVEY_EMAIL = 'REPLACE_WITH_EUROTEL_EMAIL'; // TODO: echte eurotel-Support-E-Mail eintragen
+const SUPABASE_URL = 'REPLACE_WITH_EUROTEL_SUPABASE_URL'; // TODO: eurotel-Supabase-Projekt-URL eintragen
+const SUPABASE_KEY  = 'REPLACE_WITH_EUROTEL_SUPABASE_ANON_KEY'; // TODO: eurotel-Supabase Publishable/Anon-Key eintragen
+let lastMailto = '';
+
+function buildAnswers() {
+  const form = document.getElementById('survey-form');
+  const val = name => { const el = form.querySelector(`input[name="${name}"]:checked`); return el ? Number(el.value) : null; };
+  const checked = name => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map(i => i.value);
+  const appEl = form.querySelector('input[name="app_nutzung"]:checked');
+
+  return {
+    gesamtzufriedenheit: val('gesamtzufriedenheit'),
+    webfleet_bedienung: val('webfleet_bedienung'),
+    app_nutzung: appEl ? appEl.value : null,
+    funktionen: checked('funktionen'),
+    support_reaktionszeit: val('support_reaktionszeit'),
+    support_kompetenz: val('support_kompetenz'),
+    zusatzleistungen: checked('zusatzleistungen'),
+    loesungssuche: document.getElementById('loesungssuche').value.trim(),
+    nps: val('nps'),
+    freitext: document.getElementById('freitext').value.trim(),
+    kontakt_firma: document.getElementById('kontakt-firma').value.trim(),
+    kontakt_name: document.getElementById('kontakt-name').value.trim(),
+    kontakt_email: document.getElementById('kontakt-email').value.trim(),
+  };
+}
+
+function answersToText(a) {
+  const na = '– keine Angabe –';
+  const lines = ['Kundenumfrage – eurotel', '================================', ''];
+  lines.push(`Gesamtzufriedenheit (1-5): ${a.gesamtzufriedenheit ?? na}`);
+  lines.push(`Bedienbarkeit WEBFLEET (1-5): ${a.webfleet_bedienung ?? na}`);
+  lines.push(`Nutzung mobile App (WEBFLEET Mobile): ${a.app_nutzung ?? na}`);
+  lines.push(`Meistgenutzte Funktionen: ${a.funktionen.length ? a.funktionen.join(', ') : na}`);
+  lines.push(`Reaktionszeit Support (1-5): ${a.support_reaktionszeit ?? na}`);
+  lines.push(`Kompetenz Support (1-5): ${a.support_kompetenz ?? na}`);
+  lines.push(`Interesse an Zusatzleistungen: ${a.zusatzleistungen.length ? a.zusatzleistungen.join(', ') : na}`);
+  lines.push(`Weiterempfehlung (0-10): ${a.nps ?? na}`);
+  lines.push('');
+  lines.push('An welchen Punkten wird noch eine Lösung gesucht:');
+  lines.push(a.loesungssuche || na);
+  lines.push('');
+  lines.push('Feedback / Anmerkungen:');
+  lines.push(a.freitext || na);
+  lines.push('');
+  lines.push('Kontaktdaten:');
+  lines.push(`Unternehmen: ${a.kontakt_firma || '–'}`);
+  lines.push(`Ansprechpartner: ${a.kontakt_name || '–'}`);
+  lines.push(`E-Mail: ${a.kontakt_email || '–'}`);
+  return lines.join('\n');
+}
+
+async function submitSurvey(evt) {
+  evt.preventDefault();
+  const form = document.getElementById('survey-form');
+
+  const required = form.querySelectorAll('[data-required="true"]');
+  for (const group of required) {
+    const name = group.dataset.name;
+    if (!form.querySelector(`input[name="${name}"]:checked`)) {
+      alert('Bitte beantworten Sie alle mit * markierten Pflichtfragen.');
+      group.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+  }
+
+  const kontaktFirma = document.getElementById('kontakt-firma');
+  const kontaktName = document.getElementById('kontakt-name');
+  const kontaktEmail = document.getElementById('kontakt-email');
+  for (const el of [kontaktFirma, kontaktName, kontaktEmail]) {
+    if (!el.value.trim() || !el.reportValidity()) {
+      alert('Bitte füllen Sie alle Kontaktdaten (Unternehmen, Ansprechpartner, E-Mail) aus.');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+      return false;
+    }
+  }
+
+  const submitBtn = form.querySelector('.btn-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Wird gesendet …';
+
+  const answers = buildAnswers();
+  const text = answersToText(answers);
+  let savedDirectly = false;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/umfrage_antworten`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({ data: answers }),
+    });
+    savedDirectly = res.ok;
+  } catch (e) {
+    savedDirectly = false;
+  }
+
+  document.getElementById('survey-view').style.display = 'none';
+  document.getElementById('thanks').style.display = 'block';
+
+  if (savedDirectly) {
+    document.getElementById('thanks-text').textContent = 'Ihre Antworten wurden direkt an eurotel übermittelt.';
+    document.getElementById('fallback-box').classList.remove('show');
+  } else {
+    document.getElementById('thanks-text').textContent = 'Die direkte Übermittlung hat nicht geklappt – Ihr E-Mail-Programm wurde stattdessen mit einer vorausgefüllten Nachricht geöffnet. Falls sich kein Fenster geöffnet hat, kopieren Sie den Text unten und senden Sie ihn manuell.';
+    document.getElementById('fallback-box').classList.add('show');
+    document.getElementById('fallback-text').value = text;
+    lastMailto = `mailto:${SURVEY_EMAIL}?subject=${encodeURIComponent('Kundenumfrage – Rückmeldung')}&body=${encodeURIComponent(text)}`;
+    window.location.href = lastMailto;
+  }
+  return false;
+}
+
+function mailtoAgain() {
+  if (lastMailto) window.location.href = lastMailto;
+}
+
+function copyFallback() {
+  const ta = document.getElementById('fallback-text');
+  ta.select();
+  ta.setSelectionRange(0, 99999);
+  try {
+    navigator.clipboard.writeText(ta.value);
+  } catch (e) {
+    document.execCommand('copy');
+  }
+}
+</script>
+</body>
+</html>

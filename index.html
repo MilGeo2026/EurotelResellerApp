@@ -1,0 +1,1958 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webfleet Reseller – Kunden & Verträge</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --blue-dark: #003366;
+    --blue-mid:  #005EB8;
+    --blue-acc:  #0085CA;
+    --blue-light:#E8F0F8;
+    --gray:      #6B7280;
+    --gray-light:#F3F4F6;
+    --white:     #ffffff;
+    --green:     #16A34A;
+    --red:       #DC2626;
+    --orange:    #D97706;
+    --border:    #E5E7EB;
+    --shadow:    0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #F0F4F8; color: #1F2937; font-size: 14px; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 240px; background: var(--blue-dark); display: flex; flex-direction: column;
+             position: fixed; top: 0; left: 0; height: 100vh; z-index: 200; transition: transform .25s ease; }
+  .main { margin-left: 240px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; min-width: 0; }
+  .topbar { background: var(--white); border-bottom: 1px solid var(--border);
+            padding: 0 24px; height: 60px; display: flex; align-items: center;
+            justify-content: space-between; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 50; gap: 12px; }
+  .content { padding: 28px 24px; flex: 1; }
+  .hamburger-btn { display: none; background: none; border: none; cursor: pointer;
+                   width: 34px; height: 34px; align-items: center; justify-content: center;
+                   border-radius: 7px; flex-shrink: 0; }
+  .hamburger-btn:hover { background: var(--gray-light); }
+  .hamburger-btn svg { width: 22px; height: 22px; color: var(--blue-dark); }
+  .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 150; }
+  .sidebar-overlay.open { display: block; }
+
+  /* ── Sidebar ── */
+  .sidebar-logo { padding: 20px; border-bottom: 1px solid rgba(255,255,255,.1);
+                  display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .sidebar-logo h1 { color: white; font-size: 16px; font-weight: 700; white-space: nowrap; }
+  .sidebar-logo span { color: #93C5FD; font-size: 11px; white-space: nowrap; }
+  .collapse-btn { background: rgba(255,255,255,.08); border: none; cursor: pointer;
+                  width: 26px; height: 26px; border-radius: 6px; display: flex;
+                  align-items: center; justify-content: center; flex-shrink: 0; }
+  .collapse-btn:hover { background: rgba(255,255,255,.18); }
+  .collapse-btn svg { width: 15px; height: 15px; color: white; transition: transform .2s; }
+  .nav { padding: 12px 0; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px;
+              color: rgba(255,255,255,.7); cursor: pointer; transition: all .15s;
+              font-size: 13.5px; font-weight: 500; border-left: 3px solid transparent; white-space: nowrap; }
+  .nav-item:hover { background: rgba(255,255,255,.08); color: white; }
+  .nav-item.active { background: rgba(255,255,255,.12); color: white; border-left-color: #0085CA; }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.1);
+                    color: rgba(255,255,255,.4); font-size: 11px; }
+
+  /* ── Sidebar: eingeklappt (nur Desktop, siehe Media Query unten) ── */
+  @media (min-width: 769px) {
+    body.sidebar-collapsed .sidebar { width: 68px; }
+    body.sidebar-collapsed .main { margin-left: 68px; }
+    body.sidebar-collapsed .sidebar-logo { justify-content: center; padding: 16px 8px; }
+    body.sidebar-collapsed .sidebar-logo-text,
+    body.sidebar-collapsed .nav-label,
+    body.sidebar-collapsed .sidebar-footer-text { display: none; }
+    body.sidebar-collapsed .collapse-btn svg { transform: rotate(180deg); }
+    body.sidebar-collapsed .nav-item { justify-content: center; padding: 11px 0; }
+    body.sidebar-collapsed .sidebar-footer > div:last-child { justify-content: center; }
+  }
+
+  /* ── Topbar ── */
+  .topbar-title { font-size: 17px; font-weight: 600; color: var(--blue-dark); }
+  .topbar-right { display: flex; gap: 10px; align-items: center; }
+  .badge { background: var(--blue-light); color: var(--blue-mid); padding: 3px 10px;
+           border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+  /* ── Cards ── */
+  .card { background: var(--white); border-radius: 10px; box-shadow: var(--shadow); padding: 20px; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 600; color: var(--blue-dark); }
+
+  /* ── Stat cards ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--white); border-radius: 10px; padding: 18px 20px;
+               box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px; }
+  .stat-icon { width: 46px; height: 46px; border-radius: 10px; display: flex;
+               align-items: center; justify-content: center; flex-shrink: 0; }
+  .stat-icon svg { width: 22px; height: 22px; }
+  .stat-label { font-size: 12px; color: var(--gray); font-weight: 500; }
+  .stat-value { font-size: 26px; font-weight: 700; color: var(--blue-dark); line-height: 1.1; }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+         border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer;
+         border: none; transition: all .15s; text-decoration: none; }
+  .btn-primary { background: var(--blue-mid); color: white; }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-secondary { background: var(--gray-light); color: #374151; border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: #FEE2E2; color: var(--red); }
+  .btn-danger:hover { background: #FECACA; }
+  .btn-success { background: #DCFCE7; color: var(--green); }
+  .btn-success:hover { background: #BBF7D0; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn svg { width: 15px; height: 15px; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  table.table-fixed { table-layout: fixed; }
+  table.table-fixed th, table.table-fixed td { overflow-wrap: anywhere; word-break: break-word; }
+  .vertraege-table th:nth-child(1), .vertraege-table td:nth-child(1),
+  .vertraege-table th:nth-child(4), .vertraege-table td:nth-child(4),
+  .vertraege-table th:nth-child(5), .vertraege-table td:nth-child(5),
+  .vertraege-table th:nth-child(6), .vertraege-table td:nth-child(6),
+  .vertraege-table th:nth-child(7), .vertraege-table td:nth-child(7) {
+    white-space: nowrap;
+  }
+  th { background: var(--gray-light); padding: 10px 14px; text-align: left;
+       font-size: 12px; font-weight: 600; color: var(--gray); text-transform: uppercase;
+       letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #F9FAFB; }
+  .td-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ── Status badges ── */
+  .status { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
+            border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .status-aktiv    { background: #DCFCE7; color: var(--green); }
+  .status-entwurf  { background: #FEF3C7; color: var(--orange); }
+  .status-abgelaufen { background: #FEE2E2; color: var(--red); }
+  .status-offen       { background: #EFF6FF; color: var(--blue-mid); }
+  .status-bearbeitung { background: #FEF3C7; color: var(--orange); }
+  .status-geloest     { background: #DCFCE7; color: var(--green); }
+  .status-geschlossen { background: #F3F4F6; color: var(--gray); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ── Priority badges ── */
+  .prio { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .prio-niedrig  { background: #F3F4F6; color: var(--gray); }
+  .prio-mittel   { background: #EFF6FF; color: var(--blue-mid); }
+  .prio-hoch     { background: #FFFBEB; color: var(--orange); }
+  .prio-dringend { background: #FEE2E2; color: var(--red); }
+
+  /* ── Ticket-Status-Auswahl (Inline) ── */
+  .status-select { border: none; border-radius: 20px; padding: 3px 22px 3px 9px; font-size: 11px; font-weight: 600;
+                    cursor: pointer; appearance: none; -webkit-appearance: none;
+                    background-position: right 6px center; background-repeat: no-repeat; background-size: 10px;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+
+  /* ── Modal ── */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+             z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .overlay.open { display: flex; }
+  .modal { background: white; border-radius: 12px; width: 100%; max-width: 620px;
+           max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+  .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--border);
+                  display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 17px; font-weight: 700; color: var(--blue-dark); }
+  .modal-body { padding: 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border);
+                  display: flex; justify-content: flex-end; gap: 10px; }
+  .close-btn { width: 32px; height: 32px; border-radius: 6px; border: none; background: var(--gray-light);
+               cursor: pointer; display: flex; align-items: center; justify-content: center;
+               font-size: 18px; color: var(--gray); }
+  .close-btn:hover { background: var(--border); }
+
+  /* ── Forms ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: #374151; }
+  input, select, textarea {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 13.5px; color: #1F2937; background: white; width: 100%;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(0,94,184,.1);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .section-label { font-size: 12px; font-weight: 700; color: var(--blue-dark);
+                   text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 8px; }
+
+  /* ── Checkboxes (products) ── */
+  .checkbox-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .checkbox-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 7px 10px;
+                   border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+                   transition: all .15s; }
+  .checkbox-item:hover { border-color: var(--blue-acc); background: var(--blue-light); }
+  .checkbox-item input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--blue-mid); flex-shrink:0; }
+  .checkbox-item span { font-size: 13px; flex: 1; min-width: 140px; }
+  .qty-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .qty-wrap label { font-size: 11px; color: var(--gray); white-space: nowrap; cursor: default; }
+  .qty-input { width: 52px !important; padding: 3px 6px !important; font-size: 12px !important;
+               text-align: center; border-radius: 5px !important; }
+  .ep-input  { width: 72px !important; padding: 3px 6px !important; font-size: 12px !important;
+               text-align: right; border-radius: 5px !important; }
+  .qty-input:disabled, .ep-input:disabled { background: #f3f4f6; color: #aaa; border-color: #e5e7eb; }
+  .sum-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .sum-table th { background: var(--blue-light); color: var(--blue-dark); font-weight: 700;
+                  padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  .sum-table th:last-child, .sum-table td:last-child { text-align: right; }
+  .sum-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); color: #374151; }
+  .sum-table tr:last-child td { border-bottom: none; }
+  .sum-table .sum-total td { font-weight: 700; color: var(--blue-dark); background: var(--blue-light); }
+  .sum-table .sum-mwst  td { color: var(--gray); font-size: 11px; }
+  .sum-table .sum-brutto td { font-weight: 700; font-size: 13px; color: var(--blue-dark); }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 48px 20px; color: var(--gray); }
+  .empty svg { width: 48px; height: 48px; margin: 0 auto 12px; opacity: .3; display: block; }
+  .empty p { font-size: 14px; }
+
+  /* ── Search ── */
+  .search-wrap { position: relative; }
+  .search-wrap input { padding-left: 34px; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+                 color: var(--gray); pointer-events: none; }
+  .search-icon svg { width: 15px; height: 15px; }
+
+  /* ── Page visibility ── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── Two-col layout ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .price-row { display: flex; justify-content: space-between; align-items: center;
+               padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .price-row:last-child { border-bottom: none; font-weight: 700; color: var(--blue-dark); }
+
+  @media (max-width: 900px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  /* ── Mobile (Handy) ── */
+  @media (max-width: 768px) {
+    .hamburger-btn { display: flex; }
+    .collapse-btn { display: none; }
+    .sidebar { transform: translateX(-100%); width: 260px !important; }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .topbar { padding: 0 14px; }
+    .topbar-title { font-size: 15px; }
+    .badge { display: none; }
+    .content { padding: 16px 12px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .stat-card { padding: 12px 14px; gap: 10px; }
+    .stat-icon { width: 38px; height: 38px; }
+    .stat-value { font-size: 20px; }
+    .card { padding: 14px; }
+    .card-header { flex-direction: column; align-items: stretch; gap: 10px; }
+    .search-wrap input { width: 100% !important; }
+    .form-grid { grid-template-columns: 1fr; }
+    .checkbox-grid { grid-template-columns: 1fr; }
+    .qty-wrap { flex-wrap: wrap; }
+    .modal { max-width: 100% !important; width: 100%; height: 100%; max-height: 100%;
+             border-radius: 0; margin: 0; }
+    .overlay { padding: 0; }
+    .modal-body { padding: 16px; }
+    .modal-header, .modal-footer { padding: 14px 16px; }
+    .btn { padding: 9px 14px; }
+    th, td { padding: 8px 10px; font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ AUTH SCREEN (Login / Registrierung) ══ -->
+<div id="auth-screen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F0F4F8;padding:20px;">
+  <div class="card" style="width:100%;max-width:380px;padding:32px;">
+    <h1 style="font-size:18px;color:var(--blue-dark);margin-bottom:4px;">🌐 Webfleet CRM</h1>
+    <p style="color:var(--gray);font-size:13px;margin-bottom:20px;">Reseller Portal – Anmeldung</p>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label>E-Mail</label>
+      <input id="auth-email" type="email" placeholder="name@firma.de">
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Passwort</label>
+      <input id="auth-password" type="password" placeholder="Mindestens 6 Zeichen">
+    </div>
+    <div id="auth-error" style="display:none;color:var(--red);font-size:12px;margin-bottom:10px;"></div>
+    <div id="auth-info"  style="display:none;color:var(--green);font-size:12px;margin-bottom:10px;"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:8px;" onclick="handleLogin()">Anmelden</button>
+    <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="handleSignUp()">Neu registrieren</button>
+  </div>
+</div>
+
+<div id="app-root" style="display:none">
+<div class="layout">
+
+  <!-- ══ SIDEBAR ══ -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">
+        <h1>🌐 Webfleet CRM</h1>
+        <span>Reseller Portal</span>
+      </div>
+      <button class="collapse-btn" id="collapse-btn" onclick="toggleCollapse()" aria-label="Seitenleiste einklappen" title="Seitenleiste ein-/ausklappen">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+      </button>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard')" title="Dashboard">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </div>
+      <div class="nav-item" data-page="kunden" onclick="showPage('kunden')" title="Kunden">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="nav-label">Kunden</span>
+      </div>
+      <div class="nav-item" data-page="vertraege" onclick="showPage('vertraege')" title="Verträge">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span class="nav-label">Verträge</span>
+      </div>
+      <div class="nav-item" data-page="umfrageergebnisse" onclick="showPage('umfrageergebnisse')" title="Umfrage-Ergebnisse">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h14a1 1 0 001-1V9.5a1 1 0 00-.29-.71l-5-5a1 1 0 00-1.42 0l-5 5A1 1 0 006 9.5V18a1 1 0 001 1z"/></svg>
+        <span class="nav-label">Umfrage-Ergebnisse</span>
+      </div>
+      <div class="nav-item" data-page="tickets" onclick="showPage('tickets')" title="Tickets">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6h.008v.008H6V6z"/></svg>
+        <span class="nav-label">Tickets</span>
+      </div>
+      <a class="nav-item" href="umfrage.html" target="_blank" rel="noopener" title="Kundenumfrage öffnen (neuer Tab)">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h3m-3-8h6M5 5h14a1 1 0 011 1v12a1 1 0 01-1 1H8l-4 3V6a1 1 0 011-1z"/></svg>
+        <span class="nav-label">Kundenumfrage</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="user-email" class="sidebar-footer-text" style="color:rgba(255,255,255,.6);margin-bottom:8px;word-break:break-all;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span class="sidebar-footer-text">v1.0 · Webfleet Reseller CRM</span>
+        <button class="btn btn-secondary btn-sm" onclick="handleLogout()" style="padding:3px 8px;" title="Logout">Logout</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Menü öffnen">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="topbar-title" id="topbarTitle">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <span class="badge" id="topbarBadge">Übersicht</span>
+        <button class="btn btn-primary" id="topbarBtn" onclick="openTopbarAction()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Neu
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ══ DASHBOARD ══ -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF6FF">
+              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Kunden gesamt</div>
+              <div class="stat-value" id="stat-kunden">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#F0FDF4">
+              <svg fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Aktive Verträge</div>
+              <div class="stat-value" id="stat-aktiv">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB">
+              <svg fill="none" stroke="#D97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Entwürfe</div>
+              <div class="stat-value" id="stat-entwurf">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF6FF">
+              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Jahresumsatz (netto)</div>
+              <div class="stat-value" id="stat-umsatz">€0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Letzte Verträge</span>
+              <button class="btn btn-secondary btn-sm" onclick="showPage('vertraege')">Alle anzeigen</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Kunde</th><th>Status</th><th>Wert/Jahr</th></tr></thead>
+                <tbody id="dashboard-vertraege"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Neueste Kunden</span>
+              <button class="btn btn-secondary btn-sm" onclick="showPage('kunden')">Alle anzeigen</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Unternehmen</th><th>Kontakt</th></tr></thead>
+                <tbody id="dashboard-kunden"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <span class="card-title">Kundenumfrage</span>
+            <a class="btn btn-secondary btn-sm" href="umfrage.html" target="_blank" rel="noopener">Vorschau öffnen</a>
+          </div>
+          <p style="color:var(--gray);font-size:12.5px;margin-bottom:12px">
+            Schicken Sie Ihren Kunden den Link zur Kundenumfrage – verschiedene Themen (Zufriedenheit, Hardware, Support, Zusatzleistungen u.v.m.) werden abgefragt. Die Antworten landen direkt hier im Portal unter „Umfrage-Ergebnisse".
+          </p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input id="umfrage-link" type="text" readonly style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:12.5px;background:var(--gray-light)">
+            <button class="btn btn-primary btn-sm" onclick="copyUmfrageLink()">Link kopieren</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ UMFRAGE-ERGEBNISSE ══ -->
+      <div class="page" id="page-umfrageergebnisse">
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF6FF">
+              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h14a1 1 0 001-1V9.5a1 1 0 00-.29-.71l-5-5a1 1 0 00-1.42 0l-5 5A1 1 0 006 9.5V18a1 1 0 001 1z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Antworten gesamt</div>
+              <div class="stat-value" id="stat-umfrage-anzahl">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#F0FDF4">
+              <svg fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Ø Gesamtzufriedenheit</div>
+              <div class="stat-value" id="stat-umfrage-zufriedenheit">–</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB">
+              <svg fill="none" stroke="#D97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Ø Weiterempfehlung (NPS)</div>
+              <div class="stat-value" id="stat-umfrage-nps">–</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Umfrage-Antworten</span>
+            <div class="search-wrap">
+              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+              <input type="text" placeholder="Suchen …" oninput="renderUmfrageAntworten(this.value)" style="width:220px">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:16%">Datum</th>
+                  <th style="width:18%">Zufriedenheit</th>
+                  <th style="width:18%">Weiterempfehlung</th>
+                  <th style="width:36%">Kontakt</th>
+                  <th style="width:12%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="umfrage-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TICKETS ══ -->
+      <div class="page" id="page-tickets">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#EFF6FF">
+              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Offen</div>
+              <div class="stat-value" id="stat-ticket-offen">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FFFBEB">
+              <svg fill="none" stroke="#D97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">In Bearbeitung</div>
+              <div class="stat-value" id="stat-ticket-bearbeitung">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FEE2E2">
+              <svg fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Dringend &amp; offen</div>
+              <div class="stat-value" id="stat-ticket-dringend">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#F0FDF4">
+              <svg fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Gesamt</div>
+              <div class="stat-value" id="stat-ticket-gesamt">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Ticketliste</span>
+            <div class="search-wrap">
+              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+              <input type="text" placeholder="Suchen …" oninput="renderTickets(this.value)" style="width:220px">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:24%">Titel</th>
+                  <th style="width:16%">Kunde</th>
+                  <th style="width:12%">Kategorie</th>
+                  <th style="width:11%">Priorität</th>
+                  <th style="width:14%">Status</th>
+                  <th style="width:10%">Erstellt</th>
+                  <th style="width:13%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="tickets-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ KUNDEN ══ -->
+      <div class="page" id="page-kunden">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Kundenliste</span>
+            <div class="search-wrap">
+              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+              <input type="text" placeholder="Suchen …" oninput="renderKunden(this.value)" style="width:220px">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:18%">Unternehmen</th>
+                  <th style="width:15%">Ansprechpartner</th>
+                  <th style="width:19%">E-Mail</th>
+                  <th style="width:12%">Telefon</th>
+                  <th style="width:15%">Ort</th>
+                  <th style="width:8%">Verträge</th>
+                  <th style="width:13%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="kunden-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ VERTRÄGE ══ -->
+      <div class="page" id="page-vertraege">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Vertragsliste</span>
+            <div class="search-wrap">
+              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+              <input type="text" placeholder="Suchen …" oninput="renderVertraege(this.value)" style="width:220px">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table-fixed vertraege-table">
+              <thead>
+                <tr>
+                  <th style="width:10%">Vertrag-Nr.</th>
+                  <th style="width:14%">Kunde</th>
+                  <th style="width:22%">Produkte</th>
+                  <th style="width:10%">Beginn</th>
+                  <th style="width:10%">Ende</th>
+                  <th style="width:11%">Status</th>
+                  <th style="width:10%">Wert/Jahr</th>
+                  <th style="width:13%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="vertraege-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout --></div><!-- /app-root -->
+
+
+<!-- ══ MODAL: NEUER KUNDE ══ -->
+<div class="overlay" id="modal-kunde">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-kunde-title">Neuer Kunde</span>
+      <button class="close-btn" onclick="closeModal('modal-kunde')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>Unternehmensname *</label><input id="k-firma" placeholder="Musterfirma GmbH"></div>
+        <div class="form-group"><label>Ansprechpartner *</label><input id="k-name" placeholder="Max Mustermann"></div>
+        <div class="form-group"><label>Position</label><input id="k-position" placeholder="Fuhrparkleiter"></div>
+        <div class="form-group"><label>E-Mail *</label><input id="k-email" type="email" placeholder="max@firma.de"></div>
+        <div class="form-group"><label>Telefon</label><input id="k-tel" placeholder="+49 123 456789"></div>
+        <div class="form-group full"><label>Straße & Hausnummer</label><input id="k-strasse" placeholder="Musterstraße 1"></div>
+        <div class="form-group"><label>PLZ</label><input id="k-plz" placeholder="12345"></div>
+        <div class="form-group"><label>Ort</label><input id="k-ort" placeholder="München"></div>
+        <div class="form-group"><label>Land *</label>
+          <select id="k-land">
+            <option value="Deutschland">Deutschland</option>
+            <option value="Luxemburg">Luxemburg</option>
+            <option value="Belgien">Belgien</option>
+            <option value="Andere">Andere</option>
+          </select>
+        </div>
+        <div class="form-group"><label>USt-IdNr.</label><input id="k-ust" placeholder="DE123456789"></div>
+        <div class="form-group"><label>Branche</label>
+          <select id="k-branche">
+            <option value="">– wählen –</option>
+            <option>Transport & Logistik</option>
+            <option>Handwerk & Bau</option>
+            <option>Handel & Lieferdienste</option>
+            <option>Öffentlicher Dienst</option>
+            <option>Industrie</option>
+            <option>Sonstiges</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Notizen</label><textarea id="k-notiz" placeholder="Interne Notizen …"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-kunde')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveKunde()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: NEUES TICKET ══ -->
+<div class="overlay" id="modal-ticket">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-ticket-title">Neues Ticket</span>
+      <button class="close-btn" onclick="closeModal('modal-ticket')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label>Titel *</label><input id="t-titel" placeholder="Kurze Beschreibung des Anliegens"></div>
+        <div class="form-group full">
+          <label>Kunde</label>
+          <select id="t-kunde"><option value="">– kein Kunde / allgemein –</option></select>
+        </div>
+        <div class="form-group"><label>Kategorie</label>
+          <select id="t-kategorie">
+            <option>Hardware</option>
+            <option>Software</option>
+            <option>Abrechnung</option>
+            <option>Vertrag</option>
+            <option>Sonstiges</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Priorität</label>
+          <select id="t-prioritaet">
+            <option value="niedrig">Niedrig</option>
+            <option value="mittel" selected>Mittel</option>
+            <option value="hoch">Hoch</option>
+            <option value="dringend">Dringend</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Status</label>
+          <select id="t-status">
+            <option value="offen">Offen</option>
+            <option value="bearbeitung">In Bearbeitung</option>
+            <option value="geloest">Gelöst</option>
+            <option value="geschlossen">Geschlossen</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Beschreibung</label><textarea id="t-beschreibung" placeholder="Details zum Anliegen …"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ticket')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveTicket()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: NEUER VERTRAG ══ -->
+<div class="overlay" id="modal-vertrag">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-vertrag-title">Neuer Vertrag</span>
+      <button class="close-btn" onclick="closeModal('modal-vertrag')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Kunde *</label>
+          <select id="v-kunde" onchange="updateTotal()"></select>
+        </div>
+        <div class="form-group"><label>Vertragsbeginn *</label><input id="v-beginn" type="date"></div>
+        <div class="form-group"><label>Vertragsende *</label><input id="v-ende" type="date"></div>
+        <div class="form-group"><label>Status</label>
+          <select id="v-status">
+            <option value="entwurf">Entwurf</option>
+            <option value="aktiv">Aktiv</option>
+            <option value="abgelaufen">Abgelaufen</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Zahlungsziel (Tage)</label><input id="v-zahlung" type="number" value="14" min="1"></div>
+      </div>
+
+      <div class="section-label">Produkte & Leistungen <span style="font-weight:400;color:var(--gray);font-size:11px">– Menge & Einzelpreis pro Produkt eingeben</span></div>
+      <div class="checkbox-grid">
+        <label class="checkbox-item"><input type="checkbox" id="p-link740" onchange="toggleQty(this,'q-link740','up-link740')"> <span>LINK 740 (Fahrzeugtracker, Festeinbau)</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-link740" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-link740" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-webfleet" onchange="toggleQty(this,'q-webfleet','up-webfleet')"> <span>WEBFLEET Software-Lizenz</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-webfleet" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-webfleet" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-link710" onchange="toggleQty(this,'q-link710','up-link710')"> <span>LINK 710 (Fahrzeugtracker, Rugged)</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-link710" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-link710" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-pro" onchange="toggleQty(this,'q-pro','up-pro')"> <span>PRO Driver Terminal</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-pro" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-pro" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-link245" onchange="toggleQty(this,'q-link245','up-link245')"> <span>LINK 245 (Plug & Play Tracker)</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-link245" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-link245" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-zusatzmodule" onchange="toggleQty(this,'q-zusatzmodule','up-zusatzmodule')"> <span>Zusatzmodule (OptiDrive 360 / Tachograph / Fuel &amp; CO2 Manager)</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-zusatzmodule" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-zusatzmodule" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-installation" onchange="toggleQty(this,'q-installation','up-installation')"> <span>Installation & Inbetriebnahme</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-installation" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-installation" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-support" onchange="toggleQty(this,'q-support','up-support')"> <span>Support & Wartung</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-support" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-support" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+        <label class="checkbox-item"><input type="checkbox" id="p-training" onchange="toggleQty(this,'q-training','up-training')"> <span>Schulung / Training</span><div class="qty-wrap" onclick="event.preventDefault()"><label>Menge</label><input class="qty-input" type="number" id="q-training" min="1" value="1" disabled oninput="updateTotal()"><label>EP (€)</label><input class="ep-input" type="number" id="up-training" min="0" value="0" step="0.01" disabled oninput="updateTotal()"></div></label>
+      </div>
+
+      <div class="section-label" style="margin-top:14px">Preisübersicht (netto)</div>
+      <div id="rc-hint" style="display:none;background:#FEF3C7;border:1px solid #FDE68A;border-radius:7px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#92400E">
+        ⚠️ <strong>Steuerfreie innergemeinschaftliche Lieferung (Reverse Charge):</strong> Auf diese Leistung wird keine deutsche Umsatzsteuer erhoben. Der Leistungsempfänger ist zur Berechnung und Abführung der Steuer verpflichtet (Art. 196 MwStSystRL).
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:8px">
+        <table class="sum-table">
+          <thead><tr><th>Produkt / Leistung</th><th style="text-align:center">Menge</th><th style="text-align:right">Einzelpreis</th><th style="text-align:right">Gesamt</th></tr></thead>
+          <tbody id="sum-rows"><tr><td colspan="4" style="color:var(--gray);padding:10px;text-align:center">Noch kein Produkt ausgewählt</td></tr></tbody>
+          <tfoot>
+            <tr><td colspan="3" style="padding:5px 10px;font-size:12px">Sonstiges</td>
+              <td style="padding:5px 10px;text-align:right"><input id="v-sonstiges" type="number" min="0" value="0" step="0.01" style="width:80px;text-align:right;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:5px" oninput="updateTotal()"></td></tr>
+            <tr class="sum-total"><td colspan="3">Gesamt (netto)</td><td id="tot-gesamt">€ 0,00</td></tr>
+            <tr class="sum-mwst" id="row-mwst"><td colspan="3">zzgl. 19 % MwSt.</td><td id="tot-mwst">€ 0,00</td></tr>
+            <tr class="sum-brutto" id="row-brutto"><td colspan="3">Gesamt (brutto)</td><td id="tot-brutto">€ 0,00</td></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="form-grid" style="margin-top:14px">
+        <div class="form-group full"><label>Anmerkungen</label><textarea id="v-notiz" placeholder="Besondere Vereinbarungen …"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-vertrag')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveVertrag()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: VERTRAG DETAIL / PDF ══ -->
+<div class="overlay" id="modal-detail">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title" id="detail-title">Vertragsdetails</span>
+      <button class="close-btn" onclick="closeModal('modal-detail')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Schließen</button>
+      <button class="btn btn-success" id="detail-pdf-btn">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        PDF herunterladen
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: UMFRAGE-ANTWORT DETAIL ══ -->
+<div class="overlay" id="modal-umfrage-detail">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title">Umfrage-Antwort</span>
+      <button class="close-btn" onclick="closeModal('modal-umfrage-detail')">✕</button>
+    </div>
+    <div class="modal-body" id="umfrage-detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-umfrage-detail')">Schließen</button>
+      <button class="btn btn-primary" id="umfrage-detail-ticket-btn">🎫 Ticket erstellen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  SUPABASE  (zentrale Datenbank – für alle Browser/Geräte erreichbar)
+// ══════════════════════════════════════════════════
+const SUPABASE_URL = 'REPLACE_WITH_EUROTEL_SUPABASE_URL'; // TODO: eurotel-Supabase-Projekt-URL eintragen
+const SUPABASE_KEY  = 'REPLACE_WITH_EUROTEL_SUPABASE_ANON_KEY'; // TODO: eurotel-Supabase Publishable/Anon-Key eintragen
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let kunden   = [];
+let vertraege= [];
+let umfrageAntworten = [];
+let tickets = [];
+let editingKundeId   = null;
+let editingVertragId = null;
+let editingTicketId  = null;
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+// ── Kundenumfrage-Link ──
+function initUmfrageLink() {
+  const el = document.getElementById('umfrage-link');
+  if (el) el.value = new URL('umfrage.html', window.location.href).href;
+}
+function copyUmfrageLink() {
+  const el = document.getElementById('umfrage-link');
+  el.select(); el.setSelectionRange(0, 99999);
+  try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); }
+}
+document.addEventListener('DOMContentLoaded', initUmfrageLink);
+
+// ── Auth ──
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-root').style.display = '';
+}
+function showAuthScreen() {
+  document.getElementById('app-root').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+function authMessage(msg, isError = true) {
+  const errEl = document.getElementById('auth-error');
+  const infoEl = document.getElementById('auth-info');
+  errEl.style.display = 'none'; infoEl.style.display = 'none';
+  const el = isError ? errEl : infoEl;
+  el.textContent = msg; el.style.display = 'block';
+}
+
+async function handleSignUp() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if (!email || password.length < 6) { authMessage('Bitte E-Mail und ein Passwort mit min. 6 Zeichen angeben.'); return; }
+  const { error } = await sb.auth.signUp({ email, password });
+  if (error) { authMessage(error.message); return; }
+  authMessage('Registrierung erfolgreich! Falls E-Mail-Bestätigung aktiv ist, bitte Posteingang prüfen und danach anmelden.', false);
+}
+
+async function handleLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if (!email || !password) { authMessage('Bitte E-Mail und Passwort angeben.'); return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) { authMessage(error.message); return; }
+}
+
+async function handleLogout() {
+  await sb.auth.signOut();
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    document.getElementById('user-email').textContent = session.user.email;
+    showApp();
+    loadData();
+  } else {
+    showAuthScreen();
+  }
+});
+
+// ── Daten laden ──
+async function loadData() {
+  const [{ data: kRows, error: kErr }, { data: vRows, error: vErr }, { data: uRows, error: uErr }, { data: tRows, error: tErr }] = await Promise.all([
+    sb.from('kunden').select('*').order('created_at'),
+    sb.from('vertraege').select('*').order('created_at'),
+    sb.from('umfrage_antworten').select('*').order('created_at', { ascending: false }),
+    sb.from('tickets').select('*').order('created_at', { ascending: false }),
+  ]);
+  if (kErr || vErr) { alert('Fehler beim Laden der Daten: ' + (kErr?.message || vErr?.message)); return; }
+  kunden    = (kRows || []).map(r => ({ id: r.id, ...r.data }));
+  vertraege = (vRows || []).map(r => ({ id: r.id, ...r.data }));
+  if (uErr) {
+    // Tabelle evtl. noch nicht angelegt (siehe supabase/umfrage_antworten.sql) – Seite bleibt dann leer.
+    umfrageAntworten = [];
+    console.warn('Umfrage-Antworten konnten nicht geladen werden:', uErr.message);
+  } else {
+    umfrageAntworten = (uRows || []).map(r => ({ id: r.id, created_at: r.created_at, ...r.data }));
+  }
+  if (tErr) {
+    // Tabelle evtl. noch nicht angelegt (siehe supabase/tickets.sql) – Seite bleibt dann leer.
+    tickets = [];
+    console.warn('Tickets konnten nicht geladen werden:', tErr.message);
+  } else {
+    tickets = (tRows || []).map(r => ({ id: r.id, created_at: r.created_at, ...r.data }));
+  }
+  refreshAll();
+}
+
+// ══════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════
+const pageConfig = {
+  dashboard:  { title: 'Dashboard',    badge: 'Übersicht',    btn: 'Neu' },
+  kunden:     { title: 'Kunden',       badge: 'Kundenliste',  btn: '+ Neuer Kunde' },
+  vertraege:  { title: 'Verträge',     badge: 'Vertragsliste',btn: '+ Neuer Vertrag' },
+  umfrageergebnisse: { title: 'Umfrage-Ergebnisse', badge: 'Kundenfeedback', btn: null },
+  tickets:    { title: 'Tickets',      badge: 'Support-Tickets', btn: '+ Neues Ticket' },
+};
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  const navEl = document.querySelector(`.nav-item[data-page="${id}"]`);
+  if (navEl) navEl.classList.add('active');
+  const cfg = pageConfig[id];
+  document.getElementById('topbarTitle').textContent = cfg.title;
+  document.getElementById('topbarBadge').textContent = cfg.badge;
+  const btnEl = document.getElementById('topbarBtn');
+  btnEl.style.display = cfg.btn ? '' : 'none';
+  if (cfg.btn) btnEl.lastChild.textContent = ' ' + cfg.btn;
+  currentPage = id;
+  refreshAll();
+  closeSidebar();
+}
+
+let currentPage = 'dashboard';
+
+// ══════════════════════════════════════════════════
+//  MOBILE SIDEBAR
+// ══════════════════════════════════════════════════
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+function toggleCollapse() {
+  const collapsed = document.body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('gtb_sidebar_collapsed', collapsed ? '1' : '0');
+}
+if (localStorage.getItem('gtb_sidebar_collapsed') === '1') {
+  document.body.classList.add('sidebar-collapsed');
+}
+
+function openTopbarAction() {
+  if (currentPage === 'kunden')    openKundeModal();
+  else if (currentPage === 'vertraege') openVertragModal();
+  else if (currentPage === 'tickets') openTicketModal();
+  else if (currentPage === 'umfrageergebnisse') return;
+  else openVertragModal();
+}
+
+// ══════════════════════════════════════════════════
+//  MODAL HELPERS
+// ══════════════════════════════════════════════════
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o =>
+  o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+// ══════════════════════════════════════════════════
+//  KUNDEN
+// ══════════════════════════════════════════════════
+function openKundeModal(id = null) {
+  editingKundeId = id;
+  const fields = ['firma','name','position','email','tel','strasse','plz','ort','land','ust','branche','notiz'];
+  fields.forEach(f => document.getElementById('k-'+f).value = '');
+  if (id) {
+    const k = kunden.find(x => x.id === id);
+    if (k) fields.forEach(f => { if(k[f] !== undefined) document.getElementById('k-'+f).value = k[f]; });
+    document.getElementById('modal-kunde-title').textContent = 'Kunde bearbeiten';
+  } else {
+    document.getElementById('modal-kunde-title').textContent = 'Neuer Kunde';
+  }
+  openModal('modal-kunde');
+}
+
+async function saveKunde() {
+  const firma = document.getElementById('k-firma').value.trim();
+  const name  = document.getElementById('k-name').value.trim();
+  const email = document.getElementById('k-email').value.trim();
+  if (!firma || !name || !email) { alert('Bitte Unternehmensname, Ansprechpartner und E-Mail ausfüllen.'); return; }
+  const data = {
+    firma, name, email,
+    position: document.getElementById('k-position').value.trim(),
+    tel:      document.getElementById('k-tel').value.trim(),
+    strasse:  document.getElementById('k-strasse').value.trim(),
+    plz:      document.getElementById('k-plz').value.trim(),
+    ort:      document.getElementById('k-ort').value.trim(),
+    land:     document.getElementById('k-land').value,
+    ust:      document.getElementById('k-ust').value.trim(),
+    branche:  document.getElementById('k-branche').value,
+    notiz:    document.getElementById('k-notiz').value.trim(),
+    erstellt: new Date().toISOString().slice(0,10),
+  };
+  if (editingKundeId) {
+    const idx = kunden.findIndex(x => x.id === editingKundeId);
+    const merged = { ...kunden[idx], ...data };
+    const { error } = await sb.from('kunden').update({ data: merged }).eq('id', editingKundeId);
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    kunden[idx] = { id: editingKundeId, ...merged };
+  } else {
+    const { data: inserted, error } = await sb.from('kunden').insert({ data }).select().single();
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    kunden.push({ id: inserted.id, ...data });
+  }
+  closeModal('modal-kunde'); refreshAll();
+}
+
+async function deleteKunde(id) {
+  if (!confirm('Kunden wirklich löschen? Verknüpfte Verträge bleiben erhalten.')) return;
+  const { error } = await sb.from('kunden').delete().eq('id', id);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  kunden = kunden.filter(k => k.id !== id);
+  refreshAll();
+}
+
+function renderKunden(filter = '') {
+  const tbody = document.getElementById('kunden-tbody');
+  let list = kunden;
+  if (filter) list = list.filter(k =>
+    (k.firma+k.name+k.email+k.ort).toLowerCase().includes(filter.toLowerCase()));
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <p>Noch keine Kunden angelegt.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(k => {
+    const vCount = vertraege.filter(v => v.kundeId === k.id).length;
+    return `<tr>
+      <td><strong>${esc(k.firma)}</strong>${k.branche ? `<br><span style="color:var(--gray);font-size:11px">${esc(k.branche)}</span>` : ''}</td>
+      <td>${esc(k.name)}${k.position ? `<br><span style="color:var(--gray);font-size:11px">${esc(k.position)}</span>` : ''}</td>
+      <td><a href="mailto:${esc(k.email)}" style="color:var(--blue-mid)">${esc(k.email)}</a></td>
+      <td>${esc(k.tel||'–')}</td>
+      <td>${esc(k.plz ? k.plz+' '+k.ort : k.ort||'–')}${k.land && k.land!=='Deutschland' ? `<br><span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 5px">${esc(k.land)}</span>` : ''}</td>
+      <td><span class="badge">${vCount}</span></td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="openKundeModal('${k.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteKunde('${k.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  VERTRÄGE
+// ══════════════════════════════════════════════════
+const PRODUKTE = [
+  {id:'p-link740',     qid:'q-link740',     upid:'up-link740',     label:'LINK 740 (Fahrzeugtracker, Festeinbau)'},
+  {id:'p-webfleet',    qid:'q-webfleet',    upid:'up-webfleet',    label:'WEBFLEET Software-Lizenz'},
+  {id:'p-link710',     qid:'q-link710',     upid:'up-link710',     label:'LINK 710 (Fahrzeugtracker, Rugged)'},
+  {id:'p-pro',         qid:'q-pro',         upid:'up-pro',         label:'PRO Driver Terminal'},
+  {id:'p-link245',     qid:'q-link245',     upid:'up-link245',     label:'LINK 245 (Plug & Play Tracker)'},
+  {id:'p-zusatzmodule',qid:'q-zusatzmodule',upid:'up-zusatzmodule',label:'Zusatzmodule (OptiDrive 360 / Tachograph / Fuel & CO2 Manager)'},
+  {id:'p-installation',qid:'q-installation',upid:'up-installation',label:'Installation & Inbetriebnahme'},
+  {id:'p-support',     qid:'q-support',     upid:'up-support',     label:'Support & Wartung'},
+  {id:'p-training',    qid:'q-training',    upid:'up-training',    label:'Schulung / Training'},
+];
+
+function getSelectedKunde() {
+  const id = document.getElementById('v-kunde')?.value;
+  return kunden.find(k => k.id === id) || null;
+}
+function isMwStPflichtig(kunde) {
+  if (!kunde) return true;
+  return !kunde.land || kunde.land === 'Deutschland';
+}
+
+function toggleQty(cb, qid, upid) {
+  const qEl = document.getElementById(qid);
+  const upEl = document.getElementById(upid);
+  qEl.disabled = !cb.checked;
+  upEl.disabled = !cb.checked;
+  if (cb.checked && (+qEl.value < 1 || !qEl.value)) qEl.value = 1;
+  updateTotal();
+}
+
+function openVertragModal(id = null) {
+  // Zuerst prüfen ob Kunden vorhanden
+  if (!kunden.length) {
+    alert('Bitte zuerst einen Kunden anlegen!');
+    showPage('kunden');
+    openKundeModal();
+    return;
+  }
+  editingVertragId = id;
+
+  // Reset Textfelder & Zahlenfelder
+  ['v-beginn','v-ende','v-notiz'].forEach(f => {
+    const el = document.getElementById(f); if(el) el.value = '';
+  });
+  document.getElementById('v-sonstiges').value = 0;
+  document.getElementById('v-zahlung').value   = 14;
+  document.getElementById('v-status').value    = 'entwurf';
+  PRODUKTE.forEach(p => {
+    document.getElementById(p.id).checked = false;
+    const qEl  = document.getElementById(p.qid);  qEl.value  = 1; qEl.disabled  = true;
+    const upEl = document.getElementById(p.upid); upEl.value = 0; upEl.disabled = true;
+  });
+
+  // Kunden-Dropdown befüllen
+  const sel = document.getElementById('v-kunde');
+  sel.innerHTML = kunden.map(k => `<option value="${k.id}">${esc(k.firma)}</option>`).join('');
+
+  if (id) {
+    const v = vertraege.find(x => x.id === id);
+    if (v) {
+      document.getElementById('v-kunde').value    = v.kundeId;
+      document.getElementById('v-beginn').value   = v.beginn;
+      document.getElementById('v-ende').value     = v.ende;
+      document.getElementById('v-status').value   = v.status;
+      document.getElementById('v-zahlung').value  = v.zahlung||14;
+      document.getElementById('v-sonstiges').value= v.sonstiges||0;
+      document.getElementById('v-notiz').value    = v.notiz||'';
+      (v.produkte||[]).forEach(item => {
+        const pid = typeof item === 'string' ? item : item.id;
+        const qty = typeof item === 'string' ? 1 : (item.qty||1);
+        const ep  = typeof item === 'object' ? (item.unitPrice||0) : 0;
+        const cb  = document.getElementById(pid); if(!cb) return;
+        cb.checked = true;
+        const p = PRODUKTE.find(x=>x.id===pid);
+        if(p) {
+          const qEl  = document.getElementById(p.qid);  qEl.value  = qty; qEl.disabled  = false;
+          const upEl = document.getElementById(p.upid); upEl.value = ep;  upEl.disabled = false;
+        }
+      });
+      document.getElementById('v-sonstiges').value = v.sonstiges||0;
+    }
+    document.getElementById('modal-vertrag-title').textContent = 'Vertrag bearbeiten';
+  } else {
+    document.getElementById('modal-vertrag-title').textContent = 'Neuer Vertrag';
+    const today = new Date();
+    document.getElementById('v-beginn').value = today.toISOString().slice(0,10);
+    const end = new Date(today); end.setFullYear(end.getFullYear()+1);
+    document.getElementById('v-ende').value = end.toISOString().slice(0,10);
+  }
+  updateTotal();
+  openModal('modal-vertrag');
+}
+
+function updateTotal() {
+  const fmt = n => '€ ' + n.toFixed(2).replace('.',',');
+  const checked = PRODUKTE.filter(p => document.getElementById(p.id).checked);
+  const tbody = document.getElementById('sum-rows');
+
+  if (!checked.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--gray);padding:10px;text-align:center">Noch kein Produkt ausgewählt</td></tr>';
+  } else {
+    tbody.innerHTML = checked.map(p => {
+      const qty = Math.max(1, +document.getElementById(p.qid).value || 1);
+      const ep  = +document.getElementById(p.upid).value || 0;
+      const line = qty * ep;
+      return `<tr>
+        <td>${p.label}</td>
+        <td style="text-align:center">${qty}</td>
+        <td style="text-align:right">${fmt(ep)}</td>
+        <td style="text-align:right"><strong>${fmt(line)}</strong></td>
+      </tr>`;
+    }).join('');
+  }
+
+  const produkteSum = checked.reduce((s, p) => {
+    const qty = Math.max(1, +document.getElementById(p.qid).value || 1);
+    const ep  = +document.getElementById(p.upid).value || 0;
+    return s + qty * ep;
+  }, 0);
+  const son   = +document.getElementById('v-sonstiges').value || 0;
+  const total = produkteSum + son;
+  const kunde = getSelectedKunde();
+  const mwst  = isMwStPflichtig(kunde);
+
+  document.getElementById('tot-gesamt').textContent = fmt(total);
+  document.getElementById('tot-mwst').textContent   = mwst ? fmt(total * 0.19) : '–';
+  document.getElementById('tot-brutto').textContent = mwst ? fmt(total * 1.19) : fmt(total) + ' *';
+
+  // MwSt-Zeile ein-/ausblenden & Hinweis
+  const mwstRow   = document.getElementById('row-mwst');
+  const bruttoRow = document.getElementById('row-brutto');
+  const rcHint    = document.getElementById('rc-hint');
+  if (mwstRow)   mwstRow.style.display   = mwst ? '' : 'none';
+  if (bruttoRow) bruttoRow.querySelector('td:first-child').textContent =
+    mwst ? 'Gesamt (brutto)' : 'Gesamt (= netto, steuerfrei)';
+  if (rcHint)    rcHint.style.display    = mwst ? 'none' : '';
+}
+
+async function saveVertrag() {
+  const kundeId = document.getElementById('v-kunde').value;
+  const beginn  = document.getElementById('v-beginn').value;
+  const ende    = document.getElementById('v-ende').value;
+  if (!kundeId || !beginn || !ende) { alert('Bitte Kunde, Beginn und Ende ausfüllen.'); return; }
+  const produkte = PRODUKTE
+    .filter(p => document.getElementById(p.id).checked)
+    .map(p => ({
+      id: p.id,
+      qty: Math.max(1, +document.getElementById(p.qid).value||1),
+      unitPrice: +document.getElementById(p.upid).value||0,
+    }));
+  const son   = +document.getElementById('v-sonstiges').value || 0;
+  const total = produkte.reduce((s,p) => s + p.qty * p.unitPrice, 0) + son;
+  const data = {
+    kundeId, beginn, ende, produkte,
+    status:     document.getElementById('v-status').value,
+    zahlung:    +document.getElementById('v-zahlung').value||14,
+    sonstiges:  son,
+    gesamtJahr: total,
+    notiz:      document.getElementById('v-notiz').value.trim(),
+    erstellt:   new Date().toISOString().slice(0,10),
+  };
+  if (editingVertragId) {
+    const idx = vertraege.findIndex(x => x.id === editingVertragId);
+    const merged = { ...vertraege[idx], ...data };
+    const { error } = await sb.from('vertraege').update({ data: merged }).eq('id', editingVertragId);
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    vertraege[idx] = { id: editingVertragId, ...merged };
+  } else {
+    const nr = 'GT-' + new Date().getFullYear() + '-' + String(vertraege.length+1).padStart(3,'0');
+    const payload = { nr, ...data };
+    const { data: inserted, error } = await sb.from('vertraege').insert({ data: payload }).select().single();
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    vertraege.push({ id: inserted.id, ...payload });
+  }
+  closeModal('modal-vertrag'); refreshAll();
+}
+
+async function deleteVertrag(id) {
+  if (!confirm('Vertrag wirklich löschen?')) return;
+  const { error } = await sb.from('vertraege').delete().eq('id', id);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  vertraege = vertraege.filter(v => v.id !== id);
+  refreshAll();
+}
+
+function renderVertraege(filter = '') {
+  const tbody = document.getElementById('vertraege-tbody');
+  let list = vertraege;
+  if (filter) {
+    const f = filter.toLowerCase();
+    list = list.filter(v => {
+      const k = kunden.find(x => x.id === v.kundeId);
+      return (v.nr + (k ? k.firma : '')).toLowerCase().includes(f);
+    });
+  }
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <p>Noch keine Verträge angelegt.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(v => {
+    const k = kunden.find(x => x.id === v.kundeId);
+    const firmaName = k ? k.firma : '(Kunde gelöscht)';
+    const pLabels = (v.produkte||[]).map(item => {
+      const pid = typeof item==='string'?item:item.id;
+      const qty = typeof item==='string'?1:(item.qty||1);
+      const p = PRODUKTE.find(x=>x.id===pid); return p ? p.label+(qty>1?` ×${qty}`:'') : '';
+    }).filter(Boolean);
+    const statusMap = { aktiv:'aktiv', entwurf:'entwurf', abgelaufen:'abgelaufen' };
+    const stClass = 'status-' + (statusMap[v.status]||'entwurf');
+    const stLabel = {aktiv:'Aktiv', entwurf:'Entwurf', abgelaufen:'Abgelaufen'}[v.status]||v.status;
+    const fmt = n => '€ ' + (n||0).toLocaleString('de-DE', {minimumFractionDigits:0});
+    return `<tr>
+      <td><strong>${esc(v.nr)}</strong></td>
+      <td>${esc(firmaName)}</td>
+      <td style="font-size:12px">${pLabels.slice(0,3).map(l=>`<span style="background:var(--blue-light);color:var(--blue-mid);border-radius:4px;padding:1px 6px;margin:1px;display:inline-block">${esc(l)}</span>`).join('')}${pLabels.length>3?`<span style="color:var(--gray);font-size:11px"> +${pLabels.length-3}</span>`:''}</td>
+      <td>${fmtDate(v.beginn)}</td>
+      <td>${fmtDate(v.ende)}</td>
+      <td><span class="status ${stClass}"><span class="status-dot"></span>${stLabel}</span></td>
+      <td><strong>${fmt(v.gesamtJahr)}</strong></td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" title="Details & PDF" onclick="showDetail('${v.id}')">📄</button>
+        <button class="btn btn-secondary btn-sm" onclick="openVertragModal('${v.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteVertrag('${v.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  UMFRAGE-ERGEBNISSE
+// ══════════════════════════════════════════════════
+const UMFRAGE_SCALE_LABELS = {
+  gesamtzufriedenheit: 'Gesamtzufriedenheit',
+  webfleet_bedienung: 'Bedienbarkeit WEBFLEET',
+  support_reaktionszeit: 'Reaktionszeit Support',
+  support_kompetenz: 'Kompetenz Support',
+};
+
+function renderUmfrageAntworten(filter = '') {
+  const tbody = document.getElementById('umfrage-tbody');
+  if (!tbody) return;
+
+  const anzahl = umfrageAntworten.length;
+  const avg = key => {
+    const vals = umfrageAntworten.map(a => a[key]).filter(v => v !== null && v !== undefined);
+    return vals.length ? (vals.reduce((s,v)=>s+v,0) / vals.length) : null;
+  };
+  const statAnzahl = document.getElementById('stat-umfrage-anzahl');
+  const statZuf = document.getElementById('stat-umfrage-zufriedenheit');
+  const statNps = document.getElementById('stat-umfrage-nps');
+  if (statAnzahl) statAnzahl.textContent = anzahl;
+  if (statZuf) { const v = avg('gesamtzufriedenheit'); statZuf.textContent = v !== null ? v.toFixed(1) + ' / 5' : '–'; }
+  if (statNps) { const v = avg('nps'); statNps.textContent = v !== null ? v.toFixed(1) + ' / 10' : '–'; }
+
+  let list = umfrageAntworten;
+  if (filter) {
+    const f = filter.toLowerCase();
+    list = list.filter(a => (a.kontakt_firma+a.kontakt_name+a.kontakt_email+a.freitext).toLowerCase().includes(f));
+  }
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h14a1 1 0 001-1V9.5a1 1 0 00-.29-.71l-5-5a1 1 0 00-1.42 0l-5 5A1 1 0 006 9.5V18a1 1 0 001 1z"/></svg>
+      <p>Noch keine Umfrage-Antworten eingegangen.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(a => {
+    const datum = a.created_at ? new Date(a.created_at).toLocaleDateString('de-DE') : '–';
+    const kontakt = a.kontakt_firma || a.kontakt_name
+      ? `<strong>${esc(a.kontakt_firma||'–')}</strong>${a.kontakt_name?`<br><span style="font-size:11px;color:var(--gray)">${esc(a.kontakt_name)}</span>`:''}`
+      : `<span style="color:var(--gray)">anonym</span>`;
+    return `<tr>
+      <td>${datum}</td>
+      <td>${a.gesamtzufriedenheit!=null ? a.gesamtzufriedenheit+' / 5' : '–'}</td>
+      <td>${a.nps!=null ? a.nps+' / 10' : '–'}</td>
+      <td>${kontakt}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" title="Details" onclick="showUmfrageDetail('${a.id}')">👁</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteUmfrageAntwort('${a.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function showUmfrageDetail(id) {
+  const a = umfrageAntworten.find(x => x.id === id);
+  if (!a) return;
+  const datum = a.created_at ? new Date(a.created_at).toLocaleString('de-DE') : '–';
+  const scaleRows = Object.entries(UMFRAGE_SCALE_LABELS).map(([key,label]) =>
+    `<tr><td style="color:var(--gray)">${label}</td><td style="text-align:right"><strong>${a[key]!=null ? a[key]+' / 5' : '–'}</strong></td></tr>`
+  ).join('');
+  const list = (arr) => arr && arr.length ? arr.map(esc).join(', ') : '–';
+  document.getElementById('umfrage-detail-body').innerHTML = `
+    <p style="color:var(--gray);font-size:12px;margin-bottom:14px">Eingegangen am ${datum}</p>
+    <table class="sum-table" style="margin-bottom:14px">
+      <tbody>${scaleRows}
+        <tr><td style="color:var(--gray)">Weiterempfehlung (NPS)</td><td style="text-align:right"><strong>${a.nps!=null ? a.nps+' / 10' : '–'}</strong></td></tr>
+      </tbody>
+    </table>
+    <div class="form-grid">
+      <div class="form-group full"><label>Nutzung mobile App (WEBFLEET Mobile)</label><p>${esc(a.app_nutzung || '–')}</p></div>
+      <div class="form-group full"><label>Meistgenutzte Funktionen</label><p>${list(a.funktionen)}</p></div>
+      <div class="form-group full"><label>Interesse an Zusatzleistungen</label><p>${list(a.zusatzleistungen)}</p></div>
+      <div class="form-group full"><label>Sucht aktuell noch Lösung für</label><p>${esc(a.loesungssuche) || '<span style="color:var(--gray)">– keine Angabe –</span>'}</p></div>
+      <div class="form-group full"><label>Feedback / Anmerkungen</label><p>${esc(a.freitext) || '<span style="color:var(--gray)">– keine Angabe –</span>'}</p></div>
+      <div class="form-group full"><label>Kontakt</label>
+        <p>${esc(a.kontakt_firma) || '–'}${a.kontakt_name?' · '+esc(a.kontakt_name):''}${a.kontakt_email?' · '+esc(a.kontakt_email):''}</p>
+      </div>
+    </div>`;
+  document.getElementById('umfrage-detail-ticket-btn').onclick = () => createTicketFromUmfrage(id);
+  openModal('modal-umfrage-detail');
+}
+
+async function deleteUmfrageAntwort(id) {
+  if (!confirm('Diese Umfrage-Antwort wirklich löschen?')) return;
+  const { error } = await sb.from('umfrage_antworten').delete().eq('id', id);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  umfrageAntworten = umfrageAntworten.filter(a => a.id !== id);
+  refreshAll();
+}
+
+// ══════════════════════════════════════════════════
+//  TICKETS
+// ══════════════════════════════════════════════════
+const TICKET_STATUS_LABELS = { offen: 'Offen', bearbeitung: 'In Bearbeitung', geloest: 'Gelöst', geschlossen: 'Geschlossen' };
+const TICKET_PRIO_LABELS   = { niedrig: 'Niedrig', mittel: 'Mittel', hoch: 'Hoch', dringend: 'Dringend' };
+
+function openTicketModal(id = null, prefill = null) {
+  editingTicketId = id;
+  const sel = document.getElementById('t-kunde');
+  sel.innerHTML = '<option value="">– kein Kunde / allgemein –</option>' + kunden.map(k => `<option value="${k.id}">${esc(k.firma)}</option>`).join('');
+
+  document.getElementById('t-titel').value = '';
+  document.getElementById('t-kunde').value = '';
+  document.getElementById('t-kategorie').value = 'Sonstiges';
+  document.getElementById('t-prioritaet').value = 'mittel';
+  document.getElementById('t-status').value = 'offen';
+  document.getElementById('t-beschreibung').value = '';
+
+  if (id) {
+    const t = tickets.find(x => x.id === id);
+    if (t) {
+      document.getElementById('t-titel').value = t.titel || '';
+      document.getElementById('t-kunde').value = t.kundeId || '';
+      document.getElementById('t-kategorie').value = t.kategorie || 'Sonstiges';
+      document.getElementById('t-prioritaet').value = t.prioritaet || 'mittel';
+      document.getElementById('t-status').value = t.status || 'offen';
+      document.getElementById('t-beschreibung').value = t.beschreibung || '';
+    }
+    document.getElementById('modal-ticket-title').textContent = 'Ticket bearbeiten';
+  } else {
+    document.getElementById('modal-ticket-title').textContent = 'Neues Ticket';
+    if (prefill) {
+      document.getElementById('t-titel').value = prefill.titel || '';
+      document.getElementById('t-kunde').value = prefill.kundeId || '';
+      document.getElementById('t-beschreibung').value = prefill.beschreibung || '';
+    }
+  }
+  openModal('modal-ticket');
+}
+
+async function saveTicket() {
+  const titel = document.getElementById('t-titel').value.trim();
+  if (!titel) { alert('Bitte einen Titel für das Ticket angeben.'); return; }
+  const data = {
+    titel,
+    kundeId:      document.getElementById('t-kunde').value || null,
+    kategorie:    document.getElementById('t-kategorie').value,
+    prioritaet:   document.getElementById('t-prioritaet').value,
+    status:       document.getElementById('t-status').value,
+    beschreibung: document.getElementById('t-beschreibung').value.trim(),
+  };
+  if (editingTicketId) {
+    const idx = tickets.findIndex(x => x.id === editingTicketId);
+    const merged = { ...tickets[idx], ...data };
+    const { error } = await sb.from('tickets').update({ data: merged }).eq('id', editingTicketId);
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    tickets[idx] = { id: editingTicketId, created_at: tickets[idx].created_at, ...merged };
+  } else {
+    const { data: inserted, error } = await sb.from('tickets').insert({ data }).select().single();
+    if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+    tickets.unshift({ id: inserted.id, created_at: inserted.created_at, ...data });
+  }
+  closeModal('modal-ticket'); refreshAll();
+}
+
+async function updateTicketStatus(id, status) {
+  const idx = tickets.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  const merged = { ...tickets[idx], status };
+  const { error } = await sb.from('tickets').update({ data: merged }).eq('id', id);
+  if (error) { alert('Fehler beim Aktualisieren: ' + error.message); refreshAll(); return; }
+  tickets[idx] = { id, created_at: tickets[idx].created_at, ...merged };
+  refreshAll();
+}
+
+async function deleteTicket(id) {
+  if (!confirm('Dieses Ticket wirklich löschen?')) return;
+  const { error } = await sb.from('tickets').delete().eq('id', id);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  tickets = tickets.filter(t => t.id !== id);
+  refreshAll();
+}
+
+function createTicketFromUmfrage(id) {
+  const a = umfrageAntworten.find(x => x.id === id);
+  if (!a) return;
+  const kunde = kunden.find(k => k.email && a.kontakt_email && k.email.toLowerCase() === a.kontakt_email.toLowerCase());
+  const beschreibungTeile = [];
+  if (a.loesungssuche) beschreibungTeile.push('Sucht aktuell noch Lösung für:\n' + a.loesungssuche);
+  if (a.freitext) beschreibungTeile.push('Feedback aus der Umfrage:\n' + a.freitext);
+  closeModal('modal-umfrage-detail');
+  openTicketModal(null, {
+    titel: 'Rückmeldung aus Kundenumfrage' + (a.kontakt_firma ? ' – ' + a.kontakt_firma : ''),
+    kundeId: kunde ? kunde.id : null,
+    beschreibung: beschreibungTeile.join('\n\n') || 'Siehe Umfrage-Antwort im Portal.',
+  });
+}
+
+function renderTickets(filter = '') {
+  const tbody = document.getElementById('tickets-tbody');
+  if (!tbody) return;
+
+  document.getElementById('stat-ticket-offen').textContent = tickets.filter(t => t.status === 'offen').length;
+  document.getElementById('stat-ticket-bearbeitung').textContent = tickets.filter(t => t.status === 'bearbeitung').length;
+  document.getElementById('stat-ticket-dringend').textContent = tickets.filter(t => t.prioritaet === 'dringend' && t.status !== 'geloest' && t.status !== 'geschlossen').length;
+  document.getElementById('stat-ticket-gesamt').textContent = tickets.length;
+
+  let list = tickets;
+  if (filter) {
+    const f = filter.toLowerCase();
+    list = list.filter(t => {
+      const k = kunden.find(x => x.id === t.kundeId);
+      return (t.titel + (k?k.firma:'') + t.kategorie + t.beschreibung).toLowerCase().includes(f);
+    });
+  }
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/></svg>
+      <p>Noch keine Tickets angelegt.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(t => {
+    const k = kunden.find(x => x.id === t.kundeId);
+    const datum = t.created_at ? new Date(t.created_at).toLocaleDateString('de-DE') : '–';
+    const statusOptions = Object.entries(TICKET_STATUS_LABELS).map(([val,label]) =>
+      `<option value="${val}" ${t.status===val?'selected':''}>${label}</option>`).join('');
+    return `<tr>
+      <td><strong>${esc(t.titel)}</strong>${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
+      <td>${k ? esc(k.firma) : '<span style="color:var(--gray)">–</span>'}</td>
+      <td>${esc(t.kategorie||'–')}</td>
+      <td><span class="prio prio-${t.prioritaet||'mittel'}">${TICKET_PRIO_LABELS[t.prioritaet]||'Mittel'}</span></td>
+      <td><select class="status-select status-${t.status||'offen'}" onchange="updateTicketStatus('${t.id}', this.value)">${statusOptions}</select></td>
+      <td>${datum}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="openTicketModal('${t.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTicket('${t.id}')">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  DETAIL & PDF
+// ══════════════════════════════════════════════════
+function showDetail(id) {
+  const v = vertraege.find(x => x.id === id);
+  const k = kunden.find(x => x.id === v.kundeId);
+  const pItems = (v.produkte||[]).map(item => {
+    const pid = typeof item==='string'?item:item.id;
+    const qty = typeof item==='string'?1:(item.qty||1);
+    const unitPrice = typeof item==='object'?(item.unitPrice||0):0;
+    const p = PRODUKTE.find(x=>x.id===pid); return p ? {label:p.label, qty, unitPrice} : null;
+  }).filter(Boolean);
+  const fmt = n => '€ ' + (n||0).toFixed(2).replace('.',',');
+  const stLabel = {aktiv:'Aktiv', entwurf:'Entwurf', abgelaufen:'Abgelaufen'}[v.status]||v.status;
+  const stClass = 'status-' + v.status;
+
+  document.getElementById('detail-title').textContent = v.nr + ' – ' + (k?k.firma:'');
+  document.getElementById('detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="section-label">Kundendaten</div>
+        ${k ? `
+          <p><strong>${esc(k.firma)}</strong></p>
+          <p>${esc(k.name)}${k.position ? ' · ' + esc(k.position) : ''}</p>
+          <p>${esc(k.email)}</p>
+          ${k.tel ? `<p>${esc(k.tel)}</p>` : ''}
+          ${k.strasse ? `<p>${esc(k.strasse)}<br>${esc(k.plz||'')} ${esc(k.ort||'')}</p>` : ''}
+          ${k.ust ? `<p>USt-IdNr.: ${esc(k.ust)}</p>` : ''}
+        ` : '<p style="color:var(--red)">Kunde wurde gelöscht</p>'}
+      </div>
+      <div>
+        <div class="section-label">Vertragsinfo</div>
+        <p>Status: <span class="status ${stClass}"><span class="status-dot"></span>${stLabel}</span></p>
+        <p style="margin-top:6px">Laufzeit: ${fmtDate(v.beginn)} – ${fmtDate(v.ende)}</p>
+        <p>Zahlungsziel: ${v.zahlung||14} Tage</p>
+        ${v.notiz ? `<p style="margin-top:6px;color:var(--gray);font-size:12px">${esc(v.notiz)}</p>` : ''}
+      </div>
+    </div>
+    <div class="section-label" style="margin-top:16px">Produkte & Leistungen</div>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <table class="sum-table">
+        <thead><tr><th>Produkt / Leistung</th><th style="text-align:center">Menge</th><th style="text-align:right">Einzelpreis</th><th style="text-align:right">Gesamt</th></tr></thead>
+        <tbody>${pItems.length ? pItems.map(({label,qty,unitPrice}) => `<tr>
+          <td>${esc(label)}</td>
+          <td style="text-align:center">${qty}</td>
+          <td style="text-align:right">${fmt(unitPrice||0)}</td>
+          <td style="text-align:right"><strong>${fmt(qty*(unitPrice||0))}</strong></td>
+        </tr>`).join('') : '<tr><td colspan="4" style="color:var(--gray);padding:10px;text-align:center">Keine Produkte</td></tr>'}</tbody>
+        <tfoot>
+          ${(v.sonstiges||0)>0?`<tr><td colspan="3" style="padding:5px 10px">Sonstiges</td><td style="text-align:right;padding:5px 10px">${fmt(v.sonstiges)}</td></tr>`:''}
+          <tr class="sum-total"><td colspan="3">Gesamt (netto)</td><td>${fmt(v.gesamtJahr||0)}</td></tr>
+          ${isMwStPflichtig(k) ? `
+            <tr class="sum-mwst"><td colspan="3">zzgl. 19 % MwSt.</td><td>${fmt((v.gesamtJahr||0)*0.19)}</td></tr>
+            <tr class="sum-brutto"><td colspan="3">Gesamt (brutto)</td><td>${fmt((v.gesamtJahr||0)*1.19)}</td></tr>
+          ` : `
+            <tr class="sum-brutto"><td colspan="3">Gesamt (= netto, steuerfrei)</td><td>${fmt(v.gesamtJahr||0)}</td></tr>
+            <tr class="sum-mwst"><td colspan="4" style="font-size:11px">⚠️ Steuerfreie innergem. Lieferung (Reverse Charge) – keine deutsche MwSt.</td></tr>
+          `}
+        </tfoot>
+      </table>
+    </div>
+    <div class="section-label" style="margin-top:16px">Unterschriebener Vertrag</div>
+    ${v.dokumentPfad ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--gray-light)">
+        <span style="font-size:13px">📄 ${esc(v.dokumentName||'Dokument')}</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-secondary btn-sm" onclick="ladeVertragDatei('${esc(v.dokumentPfad)}')">Herunterladen</button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0">Ersetzen
+            <input type="file" id="upload-datei-input" style="display:none" onchange="uploadVertragDatei('${id}')">
+          </label>
+        </div>
+      </div>
+    ` : `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px dashed var(--border);border-radius:8px">
+        <input type="file" id="upload-datei-input" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="uploadVertragDatei('${id}')">Hochladen</button>
+      </div>
+    `}
+  `;
+  document.getElementById('detail-pdf-btn').onclick = () => generatePDF(id);
+  openModal('modal-detail');
+}
+
+// ══════════════════════════════════════════════════
+//  UNTERSCHRIEBENER VERTRAG (Datei-Upload)
+// ══════════════════════════════════════════════════
+const DOKUMENTE_BUCKET = 'vertraege-dokumente';
+
+async function uploadVertragDatei(vertragId) {
+  const input = document.getElementById('upload-datei-input');
+  const file = input.files[0];
+  if (!file) { alert('Bitte zuerst eine Datei auswählen.'); return; }
+  const path = `${vertragId}/${Date.now()}_${file.name}`;
+  const { error: uploadError } = await sb.storage.from(DOKUMENTE_BUCKET).upload(path, file, { upsert: true });
+  if (uploadError) { alert('Fehler beim Hochladen: ' + uploadError.message); return; }
+  const idx = vertraege.findIndex(x => x.id === vertragId);
+  const merged = { ...vertraege[idx], dokumentPfad: path, dokumentName: file.name, status: 'aktiv' };
+  const { error: updateError } = await sb.from('vertraege').update({ data: merged }).eq('id', vertragId);
+  if (updateError) { alert('Fehler beim Speichern: ' + updateError.message); return; }
+  vertraege[idx] = { id: vertragId, ...merged };
+  showDetail(vertragId);
+  refreshAll();
+}
+
+async function ladeVertragDatei(pfad) {
+  const { data, error } = await sb.storage.from(DOKUMENTE_BUCKET).createSignedUrl(pfad, 60);
+  if (error) { alert('Fehler beim Laden der Datei: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
+// ══════════════════════════════════════════════════
+//  PDF GENERATION
+// ══════════════════════════════════════════════════
+function generatePDF(vertragId) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const v = vertraege.find(x => x.id === vertragId);
+  const k = kunden.find(x => x.id === v.kundeId);
+  const W = 210, ml = 18, mr = 192;
+
+  // helper
+  const fmt = n => '€ ' + (n||0).toFixed(2).replace('.',',');
+  const stLabel = {aktiv:'Aktiv', entwurf:'Entwurf', abgelaufen:'Abgelaufen'}[v.status]||v.status;
+  const mwst = isMwStPflichtig(k);
+  const pItems = (v.produkte||[]).map(item => {
+    const pid = typeof item==='string'?item:item.id;
+    const qty = typeof item==='string'?1:(item.qty||1);
+    const unitPrice = typeof item==='object'?(item.unitPrice||0):0;
+    const p = PRODUKTE.find(x=>x.id===pid); return p ? {label:p.label, qty, unitPrice} : null;
+  }).filter(Boolean);
+
+  // ── header band
+  doc.setFillColor(0, 51, 102);
+  doc.rect(0, 0, W, 28, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text('eurotel GmbH & Co. KG', ml, 11);
+  doc.setFontSize(9); doc.setFont('helvetica','normal');
+  doc.text('Schulstraße 3 · 56291 Bickenbach', ml, 17);
+  doc.setFontSize(8);
+  doc.text('[E-Mail eintragen] · [Telefon eintragen]', ml, 22);
+  doc.setFontSize(9); doc.setFont('helvetica','bold');
+  doc.text('Autorisierter Webfleet-Partner', mr, 14, {align:'right'});
+  doc.setFillColor(0, 133, 202);
+  doc.rect(0, 28, W, 2, 'F');
+
+  // ── title
+  let y = 42;
+  doc.setTextColor(0,51,102); doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.text('RESELLER- UND PARTNERVERTRAG', W/2, y, {align:'center'});
+  y += 6;
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
+  doc.text('Flottenmanagement & Telematiklösungen powered by Webfleet', W/2, y, {align:'center'});
+  y += 4;
+  doc.setDrawColor(0,94,184); doc.setLineWidth(0.5);
+  doc.line(ml, y, mr, y); y += 8;
+
+  // ── section helper
+  function sectionHeader(title) {
+    doc.setFillColor(0, 94, 184);
+    doc.rect(ml, y-4, mr-ml, 8, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(title, ml+3, y+1);
+    y += 8;
+    doc.setTextColor(50,50,50); doc.setFont('helvetica','normal');
+  }
+
+  function fieldRow(label, value) {
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+    doc.text(label, ml, y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50);
+    doc.text(value||'', ml+42, y);
+    doc.setDrawColor(0,51,102); doc.setLineWidth(0.2);
+    doc.line(ml+42, y+1, mr, y+1);
+    y += 7;
+  }
+
+  function bodyText(text) {
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+    const lines = doc.splitTextToSize(text, mr-ml);
+    doc.text(lines, ml, y);
+    y += lines.length * 5 + 2;
+  }
+
+  // ── § 1 Vertragsparteien
+  sectionHeader('§ 1  Vertragsparteien');
+  y += 2;
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.text('Reseller (Auftragnehmer)', ml, y); y += 5;
+  fieldRow('Unternehmensname:', 'eurotel GmbH & Co. KG');
+  fieldRow('Adresse / PLZ / Ort:', 'Schulstraße 3 · 56291 Bickenbach');
+  fieldRow('E-Mail / Telefon:', '[E-Mail eintragen] · [Telefon eintragen]');
+  y += 2;
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.text('Kunde / Partner (Auftraggeber)', ml, y); y += 5;
+  if (k) {
+    fieldRow('Unternehmensname:', k.firma);
+    fieldRow('Ansprechpartner:', k.name + (k.position ? ' · '+k.position : ''));
+    fieldRow('Adresse / PLZ / Ort:', (k.strasse||'') + ' · ' + (k.plz||'') + ' ' + (k.ort||''));
+    fieldRow('Land:', k.land||'Deutschland');
+    fieldRow('E-Mail / Telefon:', (k.email||'') + ' · ' + (k.tel||''));
+    if (k.ust) fieldRow('USt-IdNr.:', k.ust);
+  } else {
+    fieldRow('Unternehmensname:', ''); fieldRow('Ansprechpartner:', '');
+    fieldRow('Adresse / PLZ / Ort:', ''); fieldRow('E-Mail / Telefon:', '');
+  }
+  y += 4;
+
+  // ── § 2 Vertragsgegenstand
+  sectionHeader('§ 2  Vertragsgegenstand & Produkte');
+  y += 2;
+  bodyText('Der Reseller ist autorisierter Vertriebspartner der Webfleet Technologies (Bridgestone Mobility Solutions). Gegenstand dieses Vertrages ist die Lieferung, Installation und der Betrieb folgender Produkte und Dienstleistungen:');
+  y += 2;
+  // Produkt-Tabelle im PDF
+  const colP = ml+4, colQ = 118, colEP = 143, colGes = 168;
+  doc.setFillColor(232,240,248);
+  doc.rect(ml, y-3, mr-ml, 7, 'F');
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.text('Produkt / Leistung', colP, y+1);
+  doc.text('Menge', colQ, y+1);
+  doc.text('Einzelpreis', colEP, y+1);
+  doc.text('Gesamt', colGes, y+1);
+  y += 7;
+  if (pItems.length) {
+    pItems.forEach(({label, qty, unitPrice}) => {
+      const line = qty * (unitPrice||0);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50,50,50);
+      doc.text(label, colP, y);
+      doc.text(String(qty), colQ+5, y, {align:'right'});
+      doc.text(fmt(unitPrice||0), colEP+16, y, {align:'right'});
+      doc.setFont('helvetica','bold');
+      doc.text(fmt(line), colGes+20, y, {align:'right'});
+      doc.setFont('helvetica','normal');
+      doc.setDrawColor(220,220,220); doc.setLineWidth(0.2);
+      doc.line(ml, y+2, mr, y+2); y += 6;
+    });
+  } else {
+    doc.setFontSize(8); doc.setTextColor(150,150,150);
+    doc.text('(keine Produkte ausgewählt)', colP, y); y += 6;
+  }
+  // Sonstiges & Summen
+  if ((v.sonstiges||0) > 0) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(50,50,50);
+    doc.text('Sonstiges', colP, y);
+    doc.text(fmt(v.sonstiges), colGes+20, y, {align:'right'});
+    doc.setDrawColor(220,220,220); doc.line(ml, y+2, mr, y+2); y += 6;
+  }
+  doc.setFillColor(232,240,248);
+  doc.rect(ml, y-3, mr-ml, 7, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,51,102);
+  doc.text('Gesamt (netto)', colP, y+1);
+  doc.text(fmt(v.gesamtJahr||0), colGes+20, y+1, {align:'right'});
+  y += 8;
+  if (mwst) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(120,120,120);
+    doc.text(`zzgl. 19 % MwSt.: ${fmt((v.gesamtJahr||0)*0.19)}`, colP, y);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,51,102);
+    doc.text(`Gesamt (brutto): ${fmt((v.gesamtJahr||0)*1.19)}`, 155, y, {align:'right'});
+  } else {
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,51,102);
+    doc.text(`Gesamt (netto, steuerfrei): ${fmt(v.gesamtJahr||0)}`, colP, y);
+  }
+  y += 6;
+  if (!mwst) {
+    doc.setFillColor(254,243,199);
+    doc.rect(ml, y, mr-ml, 10, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(146,64,14);
+    const rcText = 'Steuerfreie innergemeinschaftliche Lieferung (Reverse Charge) gemaess Art. 196 MwStSystRL. ' +
+      'Die Steuerschuldnerschaft geht auf den Leistungsempfaenger ueber. Keine deutsche Umsatzsteuer.';
+    const rcLines = doc.splitTextToSize(rcText, mr-ml-6);
+    doc.text(rcLines, ml+3, y+4);
+    y += 13;
+  }
+
+  // ── § 3 Laufzeit
+  sectionHeader('§ 3  Vertragslaufzeit');
+  y += 2;
+  fieldRow('Vertragsbeginn:', fmtDate(v.beginn));
+  fieldRow('Vertragsende:', fmtDate(v.ende));
+  bodyText('Der Vertrag verlängert sich automatisch um jeweils 12 Monate, sofern er nicht mit einer Frist von 3 Monaten vor Ablauf schriftlich gekündigt wird.');
+  y += 2;
+
+  // ── § 4 Vergütung
+  sectionHeader('§ 4  Vergütung und Zahlungsbedingungen');
+  y += 2;
+  fieldRow('Zahlungsziel:', (v.zahlung||14) + ' Tage nach Rechnungsstellung');
+  y += 2;
+
+  // ── § 5 Datenschutz (kurz)
+  if (y > 230) { doc.addPage(); y = 20; }
+  sectionHeader('§ 5  Datenschutz (DSGVO)');
+  y += 2;
+  bodyText('Die Verarbeitung personenbezogener Daten erfolgt gem. DSGVO (EU) 2016/679. Der Reseller handelt als Auftragsverarbeiter gem. Art. 28 DSGVO. Ein separater Auftragsverarbeitungsvertrag (AVV) ist Bestandteil dieses Vertrages.');
+  y += 2;
+
+  // ── § 6 Kündigung
+  sectionHeader('§ 6  Kündigung & Schlussbestimmungen');
+  y += 2;
+  bodyText('Ordentliche Kündigung: 3 Monate zum Vertragsende, schriftlich. Es gilt deutsches Recht. Gerichtsstand ist der Sitz des Resellers. Änderungen bedürfen der Schriftform.');
+  if (v.notiz) { y += 2; bodyText('Anmerkungen: ' + v.notiz); }
+  y += 4;
+
+  // ── Unterschriften
+  if (y > 230) { doc.addPage(); y = 20; }
+  doc.setDrawColor(0,94,184); doc.setLineWidth(0.5);
+  doc.line(ml, y, mr, y); y += 6;
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.text('VERTRAGSUNTERZEICHNUNG', ml, y); y += 4;
+  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+  doc.text('Mit ihrer Unterschrift erkennt der Kunde den Inhalt dieses Vertrages verbindlich an.', ml, y);
+  y += 10;
+
+  // sig block (nur Kunde/Partner)
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.text('Kunde / Partner (Auftraggeber)', ml, y);
+  y += 14;
+  doc.setDrawColor(0,51,102); doc.setLineWidth(0.4);
+  doc.line(ml, y, mr, y);
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+  doc.text('Ort, Datum', ml, y+4);
+  y += 18;
+  doc.setDrawColor(0,51,102); doc.setLineWidth(0.4);
+  doc.line(ml, y, mr, y);
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+  doc.text('Unterschrift & Stempel', ml, y+4);
+
+  // ── footer on all pages
+  const total = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(220,220,220); doc.setLineWidth(0.3);
+    doc.line(ml, 284, mr, 284);
+    doc.setFontSize(7); doc.setTextColor(150,150,150); doc.setFont('helvetica','normal');
+    doc.text('Vertraulich – nur zur internen Verwendung', W/2, 288, {align:'center'});
+    doc.text(`Seite ${i} von ${total}  ·  ${v.nr}`, W/2, 292, {align:'center'});
+  }
+
+  doc.save(`${v.nr}_${k ? k.firma.replace(/\s+/g,'_') : 'Vertrag'}.pdf`);
+}
+
+// ══════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════
+function renderDashboard() {
+  document.getElementById('stat-kunden').textContent  = kunden.length;
+  document.getElementById('stat-aktiv').textContent   = vertraege.filter(v=>v.status==='aktiv').length;
+  document.getElementById('stat-entwurf').textContent = vertraege.filter(v=>v.status==='entwurf').length;
+  const umsatz = vertraege.filter(v=>v.status==='aktiv').reduce((s,v)=>s+(v.gesamtJahr||0),0);
+  document.getElementById('stat-umsatz').textContent  = '€ ' + umsatz.toLocaleString('de-DE');
+
+  // recent vertraege
+  const tv = document.getElementById('dashboard-vertraege');
+  const recent = [...vertraege].sort((a,b)=>b.erstellt?.localeCompare(a.erstellt||'')).slice(0,6);
+  if (!recent.length) { tv.innerHTML = `<tr><td colspan="3" class="empty" style="padding:20px;text-align:center;color:var(--gray)">Noch keine Verträge</td></tr>`; }
+  else tv.innerHTML = recent.map(v => {
+    const k = kunden.find(x=>x.id===v.kundeId);
+    const stClass = 'status-'+v.status;
+    const stLabel = {aktiv:'Aktiv', entwurf:'Entwurf', abgelaufen:'Abgelaufen'}[v.status]||v.status;
+    return `<tr><td><strong>${esc(k?k.firma:'–')}</strong><br><span style="font-size:11px;color:var(--gray)">${esc(v.nr)}</span></td>
+      <td><span class="status ${stClass}"><span class="status-dot"></span>${stLabel}</span></td>
+      <td>€ ${(v.gesamtJahr||0).toLocaleString('de-DE')}</td></tr>`;
+  }).join('');
+
+  // recent kunden
+  const tk = document.getElementById('dashboard-kunden');
+  const recentK = [...kunden].sort((a,b)=>b.erstellt?.localeCompare(a.erstellt||'')).slice(0,6);
+  if (!recentK.length) { tk.innerHTML = `<tr><td colspan="2" class="empty" style="padding:20px;text-align:center;color:var(--gray)">Noch keine Kunden</td></tr>`; }
+  else tk.innerHTML = recentK.map(k => `<tr>
+    <td><strong>${esc(k.firma)}</strong>${k.branche?`<br><span style="font-size:11px;color:var(--gray)">${esc(k.branche)}</span>`:''}</td>
+    <td style="font-size:12px;color:var(--gray)">${esc(k.email)}</td></tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(d) {
+  if (!d) return '–';
+  const [y,m,day] = d.split('-');
+  return `${day}.${m}.${y}`;
+}
+function refreshAll() {
+  renderDashboard();
+  renderKunden();
+  renderVertraege();
+  renderUmfrageAntworten();
+  renderTickets();
+}
+
+// ── init: Datenladen erfolgt nach erfolgreichem Login über onAuthStateChange → loadData()
+</script>
+</body>
+</html>
