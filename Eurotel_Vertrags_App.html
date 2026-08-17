@@ -559,12 +559,13 @@
             <table class="table-fixed">
               <thead>
                 <tr>
-                  <th style="width:24%">Titel</th>
-                  <th style="width:16%">Kunde</th>
-                  <th style="width:12%">Kategorie</th>
-                  <th style="width:11%">Priorität</th>
-                  <th style="width:14%">Status</th>
-                  <th style="width:10%">Erstellt</th>
+                  <th style="width:10%">Ticket-Nr.</th>
+                  <th style="width:20%">Titel</th>
+                  <th style="width:14%">Kunde</th>
+                  <th style="width:11%">Kategorie</th>
+                  <th style="width:10%">Priorität</th>
+                  <th style="width:13%">Status</th>
+                  <th style="width:9%">Erstellt</th>
                   <th style="width:13%">Aktionen</th>
                 </tr>
               </thead>
@@ -695,7 +696,8 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group full"><label>Titel *</label><input id="t-titel" placeholder="Kurze Beschreibung des Anliegens"></div>
+        <div class="form-group"><label>Titel *</label><input id="t-titel" placeholder="Kurze Beschreibung des Anliegens"></div>
+        <div class="form-group"><label>Ticket-Nr.</label><input id="t-ticketnr" placeholder="z. B. aus externem System"></div>
         <div class="form-group full">
           <label>Kunde</label>
           <select id="t-kunde"><option value="">– kein Kunde / allgemein –</option></select>
@@ -726,6 +728,15 @@
           </select>
         </div>
         <div class="form-group full"><label>Beschreibung</label><textarea id="t-beschreibung" placeholder="Details zum Anliegen …"></textarea></div>
+      </div>
+
+      <div id="t-verlauf-section" style="display:none">
+        <div class="section-label" style="margin-top:14px">Verlauf</div>
+        <div id="t-verlauf-list" style="border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px">
+          <input id="t-verlauf-eintrag" type="text" placeholder="Neues Ereignis eintragen …" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addTicketVerlaufEintrag();}">
+          <button class="btn btn-secondary btn-sm" onclick="addTicketVerlaufEintrag()">Hinzufügen</button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1426,27 +1437,51 @@ async function deleteUmfrageAntwort(id) {
 const TICKET_STATUS_LABELS = { offen: 'Offen', bearbeitung: 'In Bearbeitung', geloest: 'Gelöst', geschlossen: 'Geschlossen' };
 const TICKET_PRIO_LABELS   = { niedrig: 'Niedrig', mittel: 'Mittel', hoch: 'Hoch', dringend: 'Dringend' };
 
+function verlaufEintrag(text) {
+  return { ts: new Date().toISOString(), text };
+}
+
+function renderTicketVerlauf(t) {
+  const list = document.getElementById('t-verlauf-list');
+  const verlauf = (t.verlauf || []).slice().reverse();
+  if (!verlauf.length) {
+    list.innerHTML = `<div style="padding:10px;color:var(--gray);font-size:12px;text-align:center">Noch keine Einträge</div>`;
+    return;
+  }
+  list.innerHTML = verlauf.map(e => `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border)">
+      <div style="font-size:10.5px;color:var(--gray)">${new Date(e.ts).toLocaleString('de-DE')}</div>
+      <div style="font-size:12.5px">${esc(e.text)}</div>
+    </div>`).join('');
+}
+
 function openTicketModal(id = null, prefill = null) {
   editingTicketId = id;
   const sel = document.getElementById('t-kunde');
   sel.innerHTML = '<option value="">– kein Kunde / allgemein –</option>' + kunden.map(k => `<option value="${k.id}">${esc(k.firma)}</option>`).join('');
 
   document.getElementById('t-titel').value = '';
+  document.getElementById('t-ticketnr').value = '';
   document.getElementById('t-kunde').value = '';
   document.getElementById('t-kategorie').value = 'Sonstiges';
   document.getElementById('t-prioritaet').value = 'mittel';
   document.getElementById('t-status').value = 'offen';
   document.getElementById('t-beschreibung').value = '';
+  document.getElementById('t-verlauf-eintrag').value = '';
+  document.getElementById('t-verlauf-section').style.display = 'none';
 
   if (id) {
     const t = tickets.find(x => x.id === id);
     if (t) {
       document.getElementById('t-titel').value = t.titel || '';
+      document.getElementById('t-ticketnr').value = t.ticketnr || '';
       document.getElementById('t-kunde').value = t.kundeId || '';
       document.getElementById('t-kategorie').value = t.kategorie || 'Sonstiges';
       document.getElementById('t-prioritaet').value = t.prioritaet || 'mittel';
       document.getElementById('t-status').value = t.status || 'offen';
       document.getElementById('t-beschreibung').value = t.beschreibung || '';
+      document.getElementById('t-verlauf-section').style.display = '';
+      renderTicketVerlauf(t);
     }
     document.getElementById('modal-ticket-title').textContent = 'Ticket bearbeiten';
   } else {
@@ -1463,21 +1498,28 @@ function openTicketModal(id = null, prefill = null) {
 async function saveTicket() {
   const titel = document.getElementById('t-titel').value.trim();
   if (!titel) { alert('Bitte einen Titel für das Ticket angeben.'); return; }
+  const status = document.getElementById('t-status').value;
   const data = {
     titel,
+    ticketnr:     document.getElementById('t-ticketnr').value.trim(),
     kundeId:      document.getElementById('t-kunde').value || null,
     kategorie:    document.getElementById('t-kategorie').value,
     prioritaet:   document.getElementById('t-prioritaet').value,
-    status:       document.getElementById('t-status').value,
+    status,
     beschreibung: document.getElementById('t-beschreibung').value.trim(),
   };
   if (editingTicketId) {
     const idx = tickets.findIndex(x => x.id === editingTicketId);
-    const merged = { ...tickets[idx], ...data };
+    const verlauf = (tickets[idx].verlauf || []).slice();
+    if (status !== tickets[idx].status) {
+      verlauf.push(verlaufEintrag(`Status geändert: ${TICKET_STATUS_LABELS[tickets[idx].status]||tickets[idx].status} → ${TICKET_STATUS_LABELS[status]||status}`));
+    }
+    const merged = { ...tickets[idx], ...data, verlauf };
     const { error } = await sb.from('tickets').update({ data: merged }).eq('id', editingTicketId);
     if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
     tickets[idx] = { id: editingTicketId, created_at: tickets[idx].created_at, ...merged };
   } else {
+    data.verlauf = [verlaufEintrag('Ticket erstellt')];
     const { data: inserted, error } = await sb.from('tickets').insert({ data }).select().single();
     if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
     tickets.unshift({ id: inserted.id, created_at: inserted.created_at, ...data });
@@ -1485,10 +1527,29 @@ async function saveTicket() {
   closeModal('modal-ticket'); refreshAll();
 }
 
+async function addTicketVerlaufEintrag() {
+  if (!editingTicketId) return;
+  const input = document.getElementById('t-verlauf-eintrag');
+  const text = input.value.trim();
+  if (!text) return;
+  const idx = tickets.findIndex(x => x.id === editingTicketId);
+  if (idx < 0) return;
+  const verlauf = (tickets[idx].verlauf || []).concat(verlaufEintrag(text));
+  const merged = { ...tickets[idx], verlauf };
+  const { error } = await sb.from('tickets').update({ data: merged }).eq('id', editingTicketId);
+  if (error) { alert('Fehler beim Speichern: ' + error.message); return; }
+  tickets[idx] = { id: editingTicketId, created_at: tickets[idx].created_at, ...merged };
+  input.value = '';
+  renderTicketVerlauf(tickets[idx]);
+}
+
 async function updateTicketStatus(id, status) {
   const idx = tickets.findIndex(x => x.id === id);
   if (idx < 0) return;
-  const merged = { ...tickets[idx], status };
+  const verlauf = (tickets[idx].verlauf || []).concat(
+    verlaufEintrag(`Status geändert: ${TICKET_STATUS_LABELS[tickets[idx].status]||tickets[idx].status} → ${TICKET_STATUS_LABELS[status]||status}`)
+  );
+  const merged = { ...tickets[idx], status, verlauf };
   const { error } = await sb.from('tickets').update({ data: merged }).eq('id', id);
   if (error) { alert('Fehler beim Aktualisieren: ' + error.message); refreshAll(); return; }
   tickets[idx] = { id, created_at: tickets[idx].created_at, ...merged };
@@ -1532,11 +1593,11 @@ function renderTickets(filter = '') {
     const f = filter.toLowerCase();
     list = list.filter(t => {
       const k = kunden.find(x => x.id === t.kundeId);
-      return (t.titel + (k?k.firma:'') + t.kategorie + t.beschreibung).toLowerCase().includes(f);
+      return (t.titel + (t.ticketnr||'') + (k?k.firma:'') + t.kategorie + t.beschreibung).toLowerCase().includes(f);
     });
   }
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/></svg>
       <p>Noch keine Tickets angelegt.</p></div></td></tr>`;
     return;
@@ -1547,6 +1608,7 @@ function renderTickets(filter = '') {
     const statusOptions = Object.entries(TICKET_STATUS_LABELS).map(([val,label]) =>
       `<option value="${val}" ${t.status===val?'selected':''}>${label}</option>`).join('');
     return `<tr>
+      <td>${t.ticketnr ? esc(t.ticketnr) : '<span style="color:var(--gray)">–</span>'}</td>
       <td><strong>${esc(t.titel)}</strong>${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
       <td>${k ? esc(k.firma) : '<span style="color:var(--gray)">–</span>'}</td>
       <td>${esc(t.kategorie||'–')}</td>
