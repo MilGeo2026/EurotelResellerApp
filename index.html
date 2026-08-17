@@ -1701,7 +1701,7 @@ function generatePDF(vertragId) {
   doc.setFontSize(9); doc.setFont('helvetica','normal');
   doc.text('Schulstraße 3 · 56291 Bickenbach', ml, 17);
   doc.setFontSize(8);
-  doc.text('vertrieb@euro-tel.net · +49 (0)6746 800020', ml, 22);
+  doc.text('service@euro-tel.net · +49 (0)6746 800020', ml, 22);
   doc.setFontSize(9); doc.setFont('helvetica','bold');
   doc.text('Autorisierter Webfleet-Partner', mr, 14, {align:'right'});
   doc.setFillColor(249, 0, 138);
@@ -1752,7 +1752,7 @@ function generatePDF(vertragId) {
   doc.text('Reseller (Auftragnehmer)', ml, y); y += 5;
   fieldRow('Unternehmensname:', 'eurotel GmbH & Co. KG');
   fieldRow('Adresse / PLZ / Ort:', 'Schulstraße 3 · 56291 Bickenbach');
-  fieldRow('E-Mail / Telefon:', 'vertrieb@euro-tel.net · +49 (0)6746 800020');
+  fieldRow('E-Mail / Telefon:', 'service@euro-tel.net · +49 (0)6746 800020');
   y += 2;
   doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
   doc.text('Kunde / Partner (Auftraggeber)', ml, y); y += 5;
