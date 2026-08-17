@@ -8,10 +8,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --blue-dark: #003366;
-    --blue-mid:  #005EB8;
-    --blue-acc:  #0085CA;
-    --blue-light:#E8F0F8;
+    --blue-dark: #7E0046;
+    --blue-mid:  #E3007E;
+    --blue-acc:  #F9008A;
+    --blue-light:#FCE6F2;
     --gray:      #6B7280;
     --gray-light:#F3F4F6;
     --white:     #ffffff;
@@ -47,7 +47,7 @@
   .sidebar-logo { padding: 20px; border-bottom: 1px solid rgba(255,255,255,.1);
                   display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .sidebar-logo h1 { color: white; font-size: 16px; font-weight: 700; white-space: nowrap; }
-  .sidebar-logo span { color: #93C5FD; font-size: 11px; white-space: nowrap; }
+  .sidebar-logo span { color: #EAB8D4; font-size: 11px; white-space: nowrap; }
   .collapse-btn { background: rgba(255,255,255,.08); border: none; cursor: pointer;
                   width: 26px; height: 26px; border-radius: 6px; display: flex;
                   align-items: center; justify-content: center; flex-shrink: 0; }
@@ -58,7 +58,7 @@
               color: rgba(255,255,255,.7); cursor: pointer; transition: all .15s;
               font-size: 13.5px; font-weight: 500; border-left: 3px solid transparent; white-space: nowrap; }
   .nav-item:hover { background: rgba(255,255,255,.08); color: white; }
-  .nav-item.active { background: rgba(255,255,255,.12); color: white; border-left-color: #0085CA; }
+  .nav-item.active { background: rgba(255,255,255,.12); color: white; border-left-color: #F9008A; }
   .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
   .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.1);
                     color: rgba(255,255,255,.4); font-size: 11px; }
@@ -138,7 +138,7 @@
   .status-aktiv    { background: #DCFCE7; color: var(--green); }
   .status-entwurf  { background: #FEF3C7; color: var(--orange); }
   .status-abgelaufen { background: #FEE2E2; color: var(--red); }
-  .status-offen       { background: #EFF6FF; color: var(--blue-mid); }
+  .status-offen       { background: #FCE6F2; color: var(--blue-mid); }
   .status-bearbeitung { background: #FEF3C7; color: var(--orange); }
   .status-geloest     { background: #DCFCE7; color: var(--green); }
   .status-geschlossen { background: #F3F4F6; color: var(--gray); }
@@ -147,7 +147,7 @@
   /* ── Priority badges ── */
   .prio { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .prio-niedrig  { background: #F3F4F6; color: var(--gray); }
-  .prio-mittel   { background: #EFF6FF; color: var(--blue-mid); }
+  .prio-mittel   { background: #FCE6F2; color: var(--blue-mid); }
   .prio-hoch     { background: #FFFBEB; color: var(--orange); }
   .prio-dringend { background: #FEE2E2; color: var(--red); }
 
@@ -370,8 +370,8 @@
       <div class="page active" id="page-dashboard">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon" style="background:#EFF6FF">
-              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <div class="stat-icon" style="background:#FCE6F2">
+              <svg fill="none" stroke="#E3007E" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </div>
             <div>
               <div class="stat-label">Kunden gesamt</div>
@@ -397,8 +397,8 @@
             </div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon" style="background:#EFF6FF">
-              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="stat-icon" style="background:#FCE6F2">
+              <svg fill="none" stroke="#E3007E" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>
             <div>
               <div class="stat-label">Jahresumsatz (netto)</div>
@@ -453,8 +453,8 @@
       <div class="page" id="page-umfrageergebnisse">
         <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card">
-            <div class="stat-icon" style="background:#EFF6FF">
-              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h14a1 1 0 001-1V9.5a1 1 0 00-.29-.71l-5-5a1 1 0 00-1.42 0l-5 5A1 1 0 006 9.5V18a1 1 0 001 1z"/></svg>
+            <div class="stat-icon" style="background:#FCE6F2">
+              <svg fill="none" stroke="#E3007E" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 012-2h2a2 2 0 012 2v6m-9 0h14a1 1 0 001-1V9.5a1 1 0 00-.29-.71l-5-5a1 1 0 00-1.42 0l-5 5A1 1 0 006 9.5V18a1 1 0 001 1z"/></svg>
             </div>
             <div>
               <div class="stat-label">Antworten gesamt</div>
@@ -510,8 +510,8 @@
       <div class="page" id="page-tickets">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon" style="background:#EFF6FF">
-              <svg fill="none" stroke="#005EB8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/></svg>
+            <div class="stat-icon" style="background:#FCE6F2">
+              <svg fill="none" stroke="#E3007E" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/></svg>
             </div>
             <div>
               <div class="stat-label">Offen</div>
@@ -1693,7 +1693,7 @@ function generatePDF(vertragId) {
   }).filter(Boolean);
 
   // ── header band
-  doc.setFillColor(0, 51, 102);
+  doc.setFillColor(126, 0, 70);
   doc.rect(0, 0, W, 28, 'F');
   doc.setTextColor(255,255,255);
   doc.setFontSize(16); doc.setFont('helvetica','bold');
@@ -1704,23 +1704,23 @@ function generatePDF(vertragId) {
   doc.text('[E-Mail eintragen] · [Telefon eintragen]', ml, 22);
   doc.setFontSize(9); doc.setFont('helvetica','bold');
   doc.text('Autorisierter Webfleet-Partner', mr, 14, {align:'right'});
-  doc.setFillColor(0, 133, 202);
+  doc.setFillColor(249, 0, 138);
   doc.rect(0, 28, W, 2, 'F');
 
   // ── title
   let y = 42;
-  doc.setTextColor(0,51,102); doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.setTextColor(126,0,70); doc.setFontSize(18); doc.setFont('helvetica','bold');
   doc.text('RESELLER- UND PARTNERVERTRAG', W/2, y, {align:'center'});
   y += 6;
   doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100);
   doc.text('Flottenmanagement & Telematiklösungen powered by Webfleet', W/2, y, {align:'center'});
   y += 4;
-  doc.setDrawColor(0,94,184); doc.setLineWidth(0.5);
+  doc.setDrawColor(227,0,126); doc.setLineWidth(0.5);
   doc.line(ml, y, mr, y); y += 8;
 
   // ── section helper
   function sectionHeader(title) {
-    doc.setFillColor(0, 94, 184);
+    doc.setFillColor(227, 0, 126);
     doc.rect(ml, y-4, mr-ml, 8, 'F');
     doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
     doc.text(title, ml+3, y+1);
@@ -1729,11 +1729,11 @@ function generatePDF(vertragId) {
   }
 
   function fieldRow(label, value) {
-    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
     doc.text(label, ml, y);
     doc.setFont('helvetica','normal'); doc.setTextColor(50,50,50);
     doc.text(value||'', ml+42, y);
-    doc.setDrawColor(0,51,102); doc.setLineWidth(0.2);
+    doc.setDrawColor(126,0,70); doc.setLineWidth(0.2);
     doc.line(ml+42, y+1, mr, y+1);
     y += 7;
   }
@@ -1748,13 +1748,13 @@ function generatePDF(vertragId) {
   // ── § 1 Vertragsparteien
   sectionHeader('§ 1  Vertragsparteien');
   y += 2;
-  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
   doc.text('Reseller (Auftragnehmer)', ml, y); y += 5;
   fieldRow('Unternehmensname:', 'eurotel GmbH & Co. KG');
   fieldRow('Adresse / PLZ / Ort:', 'Schulstraße 3 · 56291 Bickenbach');
   fieldRow('E-Mail / Telefon:', '[E-Mail eintragen] · [Telefon eintragen]');
   y += 2;
-  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
   doc.text('Kunde / Partner (Auftraggeber)', ml, y); y += 5;
   if (k) {
     fieldRow('Unternehmensname:', k.firma);
@@ -1776,9 +1776,9 @@ function generatePDF(vertragId) {
   y += 2;
   // Produkt-Tabelle im PDF
   const colP = ml+4, colQ = 118, colEP = 143, colGes = 168;
-  doc.setFillColor(232,240,248);
+  doc.setFillColor(252,230,242);
   doc.rect(ml, y-3, mr-ml, 7, 'F');
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
   doc.text('Produkt / Leistung', colP, y+1);
   doc.text('Menge', colQ, y+1);
   doc.text('Einzelpreis', colEP, y+1);
@@ -1808,19 +1808,19 @@ function generatePDF(vertragId) {
     doc.text(fmt(v.sonstiges), colGes+20, y, {align:'right'});
     doc.setDrawColor(220,220,220); doc.line(ml, y+2, mr, y+2); y += 6;
   }
-  doc.setFillColor(232,240,248);
+  doc.setFillColor(252,230,242);
   doc.rect(ml, y-3, mr-ml, 7, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(0,51,102);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(126,0,70);
   doc.text('Gesamt (netto)', colP, y+1);
   doc.text(fmt(v.gesamtJahr||0), colGes+20, y+1, {align:'right'});
   y += 8;
   if (mwst) {
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(120,120,120);
     doc.text(`zzgl. 19 % MwSt.: ${fmt((v.gesamtJahr||0)*0.19)}`, colP, y);
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,51,102);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(126,0,70);
     doc.text(`Gesamt (brutto): ${fmt((v.gesamtJahr||0)*1.19)}`, 155, y, {align:'right'});
   } else {
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(0,51,102);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(126,0,70);
     doc.text(`Gesamt (netto, steuerfrei): ${fmt(v.gesamtJahr||0)}`, colP, y);
   }
   y += 6;
@@ -1865,24 +1865,24 @@ function generatePDF(vertragId) {
 
   // ── Unterschriften
   if (y > 230) { doc.addPage(); y = 20; }
-  doc.setDrawColor(0,94,184); doc.setLineWidth(0.5);
+  doc.setDrawColor(227,0,126); doc.setLineWidth(0.5);
   doc.line(ml, y, mr, y); y += 6;
-  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
   doc.text('VERTRAGSUNTERZEICHNUNG', ml, y); y += 4;
   doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
   doc.text('Mit ihrer Unterschrift erkennt der Kunde den Inhalt dieses Vertrages verbindlich an.', ml, y);
   y += 10;
 
   // sig block (nur Kunde/Partner)
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(0,51,102);
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(126,0,70);
   doc.text('Kunde / Partner (Auftraggeber)', ml, y);
   y += 14;
-  doc.setDrawColor(0,51,102); doc.setLineWidth(0.4);
+  doc.setDrawColor(126,0,70); doc.setLineWidth(0.4);
   doc.line(ml, y, mr, y);
   doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
   doc.text('Ort, Datum', ml, y+4);
   y += 18;
-  doc.setDrawColor(0,51,102); doc.setLineWidth(0.4);
+  doc.setDrawColor(126,0,70); doc.setLineWidth(0.4);
   doc.line(ml, y, mr, y);
   doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
   doc.text('Unterschrift & Stempel', ml, y+4);
