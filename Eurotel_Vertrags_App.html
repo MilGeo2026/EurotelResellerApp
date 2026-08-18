@@ -6,6 +6,7 @@
 <title>Webfleet Reseller – Kunden & Verträge</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://alcdn.msauth.net/browser/3.18.0/js/msal-browser.min.js"></script>
 <style>
   :root {
     --blue-dark: #003366;
@@ -339,6 +340,10 @@
     </nav>
     <div class="sidebar-footer">
       <div id="user-email" class="sidebar-footer-text" style="color:rgba(255,255,255,.6);margin-bottom:8px;word-break:break-all;"></div>
+      <div id="outlook-status" style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px;">
+        <span class="sidebar-footer-text" id="outlook-status-text" style="color:rgba(255,255,255,.6);">✉ Outlook nicht verbunden</span>
+        <button class="btn btn-secondary btn-sm" id="outlook-connect-btn" onclick="connectOutlook()" style="padding:3px 8px;" title="Mit Microsoft/Outlook verbinden">Verbinden</button>
+      </div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span class="sidebar-footer-text">v1.0 · Webfleet Reseller CRM</span>
         <button class="btn btn-secondary btn-sm" onclick="handleLogout()" style="padding:3px 8px;" title="Logout">Logout</button>
@@ -814,10 +819,39 @@
     <div class="modal-body" id="detail-body"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-detail')">Schließen</button>
+      <button class="btn btn-primary" id="detail-mail-btn">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        Per E-Mail senden
+      </button>
       <button class="btn btn-success" id="detail-pdf-btn">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         PDF herunterladen
       </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL: E-MAIL SENDEN (über Outlook / Microsoft Graph) ══ -->
+<div class="overlay" id="modal-email">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title">E-Mail senden</span>
+      <button class="close-btn" onclick="closeModal('modal-email')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="email-not-connected" style="display:none;background:#FEF3C7;color:#92400E;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;">
+        Nicht mit Outlook verbunden. Bitte zuerst unten links auf „Verbinden" klicken und mit deinem Microsoft-Konto anmelden.
+      </div>
+      <div class="form-group"><label>An *</label><input id="email-to" type="email" placeholder="empfaenger@firma.de"></div>
+      <div class="form-group"><label>Cc</label><input id="email-cc" type="text" placeholder="optional, mehrere per Komma trennen"></div>
+      <div class="form-group"><label>Betreff *</label><input id="email-subject" type="text"></div>
+      <div class="form-group"><label>Nachricht</label><textarea id="email-body" rows="8"></textarea></div>
+      <div id="email-attachment-info" style="display:none;font-size:12px;color:var(--gray);margin-top:-6px;">📎 <span id="email-attachment-name"></span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-email')">Abbrechen</button>
+      <button class="btn btn-primary" id="email-send-btn" onclick="sendEmailFromModal()">Senden</button>
     </div>
   </div>
 </div>
@@ -845,6 +879,186 @@
 const SUPABASE_URL = 'https://xwnprohgxzzrxwkpwpxk.supabase.co';
 const SUPABASE_KEY  = 'sb_publishable_e5AdnOmI4muh50aDJKb58A_lOjWHfrt';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ══════════════════════════════════════════════════
+//  OUTLOOK / MICROSOFT GRAPH  (E-Mail direkt aus dem CRM versenden)
+// ══════════════════════════════════════════════════
+// Setup (einmalig, durch einen Admin mit Zugriff auf das Microsoft-365-Tenant von eurotel):
+//   1. In https://portal.azure.com → „App-Registrierungen" → „Neue Registrierung":
+//      - Kontotypen: „Nur Konten in diesem Organisationsverzeichnis" (euro-tel.net) oder „Multi-Tenant", je nach Bedarf
+//      - Plattform: „Single-page application (SPA)", Redirect-URI: die URL, unter der diese App läuft
+//        (z. B. https://milgeo2026.github.io/EurotelResellerApp/ und ggf. http://localhost:xxxx für Tests)
+//   2. Unter „API-Berechtigungen" → „Berechtigung hinzufügen" → Microsoft Graph → Delegiert → Mail.Send, User.Read
+//   3. Die „Anwendungs-ID (Client)" von der Übersichtsseite unten eintragen:
+const MSAL_CLIENT_ID = ''; // TODO: Azure-AD Client-ID eintragen, siehe Anleitung oben
+const MSAL_TENANT     = 'common'; // 'common' = beliebiges Microsoft-Konto; alternativ eure Tenant-ID für euro-tel.net
+const MSAL_SCOPES     = ['Mail.Send', 'User.Read'];
+
+let msalInstance = null;
+let msalAccount   = null;
+
+function msalReady() {
+  return !!MSAL_CLIENT_ID && typeof msal !== 'undefined';
+}
+
+function getMsalInstance() {
+  if (!msalInstance && msalReady()) {
+    msalInstance = new msal.PublicClientApplication({
+      auth: {
+        clientId: MSAL_CLIENT_ID,
+        authority: `https://login.microsoftonline.com/${MSAL_TENANT}`,
+        redirectUri: window.location.origin + window.location.pathname,
+      },
+      cache: { cacheLocation: 'sessionStorage' },
+    });
+  }
+  return msalInstance;
+}
+
+async function connectOutlook() {
+  if (!msalReady()) {
+    alert('Outlook-Anbindung ist noch nicht eingerichtet.\n\nEs fehlt die Azure-AD Client-ID (MSAL_CLIENT_ID) im Quellcode – siehe Kommentar über dieser Funktion für die Einrichtungsschritte.');
+    return;
+  }
+  const inst = getMsalInstance();
+  try {
+    const result = await inst.loginPopup({ scopes: MSAL_SCOPES });
+    msalAccount = result.account;
+    inst.setActiveAccount(msalAccount);
+    updateOutlookStatusUI();
+  } catch (e) {
+    alert('Verbindung mit Outlook fehlgeschlagen: ' + e.message);
+  }
+}
+
+function disconnectOutlook() {
+  const inst = getMsalInstance();
+  msalAccount = null;
+  if (inst) inst.setActiveAccount(null);
+  updateOutlookStatusUI();
+}
+
+async function getGraphAccessToken() {
+  if (!msalReady()) throw new Error('Outlook-Anbindung ist nicht eingerichtet (Client-ID fehlt).');
+  const inst = getMsalInstance();
+  const account = msalAccount || inst.getActiveAccount() || inst.getAllAccounts()[0];
+  if (!account) throw new Error('Nicht mit Outlook verbunden. Bitte zuerst verbinden.');
+  msalAccount = account;
+  try {
+    const result = await inst.acquireTokenSilent({ scopes: MSAL_SCOPES, account });
+    return result.accessToken;
+  } catch (e) {
+    const result = await inst.acquireTokenPopup({ scopes: MSAL_SCOPES, account });
+    return result.accessToken;
+  }
+}
+
+function updateOutlookStatusUI() {
+  const textEl = document.getElementById('outlook-status-text');
+  const btnEl  = document.getElementById('outlook-connect-btn');
+  if (!textEl || !btnEl) return;
+  const inst = msalReady() ? getMsalInstance() : null;
+  const account = msalAccount || inst?.getActiveAccount() || inst?.getAllAccounts()[0];
+  if (account) {
+    msalAccount = account;
+    textEl.textContent = '✉ Verbunden: ' + (account.username || account.name || '');
+    btnEl.textContent = 'Trennen';
+    btnEl.onclick = disconnectOutlook;
+  } else {
+    textEl.textContent = '✉ Outlook nicht verbunden';
+    btnEl.textContent = 'Verbinden';
+    btnEl.onclick = connectOutlook;
+  }
+}
+
+async function sendMailViaGraph({ to, cc, subject, bodyText, attachment }) {
+  const token = await getGraphAccessToken();
+  const toRecipients = String(to || '').split(',').map(a => a.trim()).filter(Boolean)
+    .map(address => ({ emailAddress: { address } }));
+  const ccRecipients = String(cc || '').split(',').map(a => a.trim()).filter(Boolean)
+    .map(address => ({ emailAddress: { address } }));
+  if (!toRecipients.length) throw new Error('Bitte mindestens einen Empfänger angeben.');
+
+  const message = {
+    subject: subject || '',
+    body: { contentType: 'Text', content: bodyText || '' },
+    toRecipients,
+    ccRecipients,
+  };
+  if (attachment) {
+    message.attachments = [{
+      '@odata.type': '#microsoft.graph.fileAttachment',
+      name: attachment.name,
+      contentType: attachment.contentType || 'application/octet-stream',
+      contentBytes: attachment.base64,
+    }];
+  }
+
+  const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, saveToSentItems: true }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Graph API Fehler (${res.status}): ${errText || res.statusText}`);
+  }
+}
+
+// ── E-Mail-Compose-Modal ──
+let pendingEmailAttachment = null;
+
+function openEmailModal({ to = '', cc = '', subject = '', body = '', attachment = null } = {}) {
+  document.getElementById('email-to').value = to;
+  document.getElementById('email-cc').value = cc;
+  document.getElementById('email-subject').value = subject;
+  document.getElementById('email-body').value = body;
+  pendingEmailAttachment = attachment;
+  const infoEl = document.getElementById('email-attachment-info');
+  if (attachment) {
+    document.getElementById('email-attachment-name').textContent = attachment.name;
+    infoEl.style.display = 'block';
+  } else {
+    infoEl.style.display = 'none';
+  }
+  const inst = msalReady() ? getMsalInstance() : null;
+  const connected = !!(msalAccount || inst?.getActiveAccount() || inst?.getAllAccounts()[0]);
+  document.getElementById('email-not-connected').style.display = connected ? 'none' : 'block';
+  openModal('modal-email');
+}
+
+async function sendEmailFromModal() {
+  const to = document.getElementById('email-to').value.trim();
+  const cc = document.getElementById('email-cc').value.trim();
+  const subject = document.getElementById('email-subject').value.trim();
+  const bodyText = document.getElementById('email-body').value;
+  if (!to || !subject) { alert('Bitte Empfänger und Betreff angeben.'); return; }
+
+  const btn = document.getElementById('email-send-btn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Wird gesendet …';
+  try {
+    await sendMailViaGraph({ to, cc, subject, bodyText, attachment: pendingEmailAttachment });
+    closeModal('modal-email');
+    alert('E-Mail wurde über Outlook versendet.');
+  } catch (e) {
+    alert('E-Mail konnte nicht gesendet werden: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = originalLabel;
+  }
+}
+
+function sendKundeMail(kundeId) {
+  const k = kunden.find(x => x.id === kundeId);
+  if (!k) return;
+  openEmailModal({
+    to: k.email || '',
+    subject: `eurotel Webfleet – ${k.firma || ''}`,
+    body: `Sehr geehrte(r) ${k.name || ''},\n\n\n\nMit freundlichen Grüßen\nIhr eurotel Team`,
+  });
+}
+
+document.addEventListener('DOMContentLoaded', updateOutlookStatusUI);
 
 let kunden   = [];
 let vertraege= [];
@@ -1088,6 +1302,7 @@ function renderKunden(filter = '') {
       <td>${esc(k.plz ? k.plz+' '+k.ort : k.ort||'–')}${k.land && k.land!=='Deutschland' ? `<br><span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 5px">${esc(k.land)}</span>` : ''}</td>
       <td><span class="badge">${vCount}</span></td>
       <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" title="E-Mail senden" onclick="sendKundeMail('${k.id}')">✉</button>
         <button class="btn btn-secondary btn-sm" onclick="openKundeModal('${k.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteKunde('${k.id}')">🗑</button>
       </div></td>
@@ -1641,6 +1856,7 @@ function showDetail(id) {
     `}
   `;
   document.getElementById('detail-pdf-btn').onclick = () => generatePDF(id);
+  document.getElementById('detail-mail-btn').onclick = () => sendVertragPerMail(id);
   openModal('modal-detail');
 }
 
@@ -1675,6 +1891,24 @@ async function ladeVertragDatei(pfad) {
 //  PDF GENERATION
 // ══════════════════════════════════════════════════
 function generatePDF(vertragId) {
+  const { doc, filename } = buildVertragPDF(vertragId);
+  doc.save(filename);
+}
+
+function sendVertragPerMail(vertragId) {
+  const { doc, filename } = buildVertragPDF(vertragId);
+  const v = vertraege.find(x => x.id === vertragId);
+  const k = kunden.find(x => x.id === v.kundeId);
+  const base64 = doc.output('datauristring').split(',')[1];
+  openEmailModal({
+    to: k?.email || '',
+    subject: `Ihr Vertrag ${v.nr} – eurotel Webfleet Reseller`,
+    body: `Sehr geehrte(r) ${k?.name || ''},\n\nanbei erhalten Sie Ihren Vertrag ${v.nr} als PDF.\n\nMit freundlichen Grüßen\nIhr eurotel Team`,
+    attachment: { name: filename, base64, contentType: 'application/pdf' },
+  });
+}
+
+function buildVertragPDF(vertragId) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const v = vertraege.find(x => x.id === vertragId);
@@ -1898,7 +2132,8 @@ function generatePDF(vertragId) {
     doc.text(`Seite ${i} von ${total}  ·  ${v.nr}`, W/2, 292, {align:'center'});
   }
 
-  doc.save(`${v.nr}_${k ? k.firma.replace(/\s+/g,'_') : 'Vertrag'}.pdf`);
+  const filename = `${v.nr}_${k ? k.firma.replace(/\s+/g,'_') : 'Vertrag'}.pdf`;
+  return { doc, filename };
 }
 
 // ══════════════════════════════════════════════════
