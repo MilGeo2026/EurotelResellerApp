@@ -4,119 +4,172 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kundenumfrage – eurotel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237E0046'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='34' font-weight='700' fill='%23fff' text-anchor='middle'%3Ee%3C/text%3E%3C/svg%3E">
 <style>
   :root {
-    --blue-dark: #003366;
-    --blue-mid:  #005EB8;
-    --blue-acc:  #0085CA;
-    --blue-light:#E8F0F8;
-    --gray:      #6B7280;
-    --gray-light:#F3F4F6;
+    --blue-dark: #7E0046;
+    --blue-mid:  #E3007E;
+    --blue-acc:  #F9008A;
+    --blue-light:#FCE6F2;
+    --ink:       #271821;
+    --ink-soft:  #5C4A53;
+    --ink-faint: #8E7A83;
+    --paper:     #FBF5F8;
     --white:     #ffffff;
     --green:     #16A34A;
-    --border:    #E5E7EB;
-    --shadow:    0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,.1), 0 4px 6px rgba(0,0,0,.05);
+    --red:       #D6265A;
+    --border:    #EDDEE7;
+    --shadow:    0 1px 3px rgba(126,0,70,.08), 0 1px 2px rgba(126,0,70,.06);
+    --shadow-lg: 0 20px 40px -12px rgba(126,0,70,.22), 0 4px 10px rgba(126,0,70,.06);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #F0F4F8; color: #1F2937; font-size: 14px; line-height: 1.5;
-    padding: 24px 14px 60px;
+    background: var(--paper); color: var(--ink); font-size: 14px; line-height: 1.55;
+    padding: 0 14px 60px;
   }
   .wrap { max-width: 720px; margin: 0 auto; }
 
-  .header { background: var(--blue-dark); border-radius: 12px 12px 0 0; padding: 26px 28px; color: #fff; position: relative; overflow: hidden; }
-  .header::after { content:''; position:absolute; top:-40px; right:-40px; width:160px; height:160px; border-radius:50%; background:rgba(255,255,255,.06); }
-  .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-  .header .sub { color: #93C5FD; font-size: 12.5px; }
-  .header .badge { display:inline-block; margin-top:12px; background: rgba(255,255,255,.12); color:#fff; padding:4px 12px; border-radius:20px; font-size:11.5px; font-weight:600; }
+  /* ── Fortschrittsleiste ── */
+  .progress-rail { position: sticky; top: 0; z-index: 20; padding-top: 14px; padding-bottom: 6px; background: linear-gradient(var(--paper) 65%, transparent); }
+  .progress-track { height: 6px; border-radius: 20px; background: var(--border); overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; border-radius: 20px; background: linear-gradient(90deg, var(--blue-dark), var(--blue-mid), var(--blue-acc)); transition: width .35s ease; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-faint); margin-top: 5px; letter-spacing: .02em; }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, var(--blue-dark) 0%, #9C0057 55%, var(--blue-mid) 130%);
+    border-radius: 16px 16px 0 0; padding: 30px 28px 28px; color: #fff; position: relative; overflow: hidden;
+  }
+  .header::before { content:''; position:absolute; top:-60px; right:-40px; width:200px; height:200px; border-radius:50%; background:rgba(255,255,255,.08); }
+  .header::after { content:''; position:absolute; bottom:-70px; left:-30px; width:150px; height:150px; border-radius:50%; background:rgba(255,255,255,.06); }
+  .header-top { display: flex; align-items: center; gap: 12px; position: relative; }
+  .brand-mark {
+    width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.28); display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .header h1 { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+  .header .sub { color: #F3C4DE; font-size: 12.5px; margin-top: 1px; }
+  .header .badge {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.22); color: #fff; padding: 5px 13px; border-radius: 20px;
+    font-size: 11.5px; font-weight: 600; position: relative;
+  }
 
   .intro { background: var(--white); padding: 22px 28px; border-bottom: 1px solid var(--border); }
-  .intro p { color: #374151; font-size: 13.5px; }
+  .intro p { color: var(--ink-soft); font-size: 13.5px; }
   .intro p + p { margin-top: 8px; }
 
-  form { background: var(--white); border-radius: 0 0 12px 12px; box-shadow: var(--shadow-lg); }
+  form { background: var(--white); border-radius: 0 0 16px 16px; box-shadow: var(--shadow-lg); }
 
-  .section { padding: 22px 28px; border-bottom: 1px solid var(--border); }
+  /* ── Abschnitte als verbundene Schritte ── */
+  .section {
+    padding: 24px 28px; border-bottom: 1px solid var(--border); position: relative;
+  }
   .section:last-of-type { border-bottom: none; }
-  .section-title { font-size: 14.5px; font-weight: 700; color: var(--blue-dark); margin-bottom: 3px; display:flex; align-items:center; gap:8px; }
-  .section-title .num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background: var(--blue-light); color: var(--blue-mid); font-size: 11.5px; font-weight:700; flex-shrink:0; }
-  .section-hint { color: var(--gray); font-size: 12px; margin-bottom: 16px; margin-left: 30px; }
+  .section:not(:last-of-type)::before {
+    content: ''; position: absolute; left: 39px; top: 54px; bottom: 0; width: 2px;
+    background: linear-gradient(var(--border), var(--border));
+  }
+  .section-title { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 3px; display:flex; align-items:center; gap:11px; position: relative; z-index: 1; }
+  .section-title .num {
+    display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%;
+    background: var(--blue-mid); color: #fff; font-size: 11.5px; font-weight:700; flex-shrink:0;
+    box-shadow: 0 0 0 4px var(--blue-light);
+  }
+  .section-hint { color: var(--ink-faint); font-size: 12px; margin-bottom: 18px; margin-left: 35px; }
 
-  .q { margin-bottom: 18px; margin-left: 30px; }
+  .q { margin-bottom: 20px; margin-left: 35px; }
   .q:last-child { margin-bottom: 0; }
-  .q label.qlabel { display:block; font-weight:600; font-size: 13px; color:#1F2937; margin-bottom: 9px; }
-  .q label.qlabel .opt { font-weight: 400; color: var(--gray); font-size: 11.5px; }
+  .q label.qlabel { display:block; font-weight:600; font-size: 13px; color:var(--ink); margin-bottom: 10px; }
+  .q label.qlabel .opt { font-weight: 400; color: var(--ink-faint); font-size: 11.5px; }
 
   /* Skalen (1-5) */
   .scale { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .scale input { display:none; }
-  .scale .opt-btn { min-width: 42px; height:42px; border:1.5px solid var(--border); border-radius:9px;
-                     display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:700;
-                     color: var(--gray); transition: all .15s; font-size:13.5px; padding: 0 6px; }
-  .scale .opt-btn:hover { border-color: var(--blue-acc); color: var(--blue-mid); }
-  .scale input:checked + .opt-btn { background: var(--blue-mid); border-color: var(--blue-mid); color:#fff; }
-  .scale-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--gray); margin-top:6px; max-width: 320px; }
+  .scale .opt-btn {
+    min-width: 42px; height:42px; border:1.5px solid var(--border); border-radius:10px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; font-weight:700;
+    color: var(--ink-soft); transition: all .15s; font-size:13.5px; padding: 0 6px; background: var(--white);
+  }
+  .scale .opt-btn:hover { border-color: var(--blue-acc); color: var(--blue-mid); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .scale input:checked + .opt-btn { background: var(--blue-mid); border-color: var(--blue-mid); color:#fff; box-shadow: 0 4px 12px -2px rgba(227,0,126,.45); }
+  .scale-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--ink-faint); margin-top:7px; max-width: 320px; }
   .nps-row { display:flex; gap:6px; flex-wrap:wrap; }
-  .nps-row .opt-btn { min-width: 34px; height:34px; font-size:12.5px; }
+  .nps-row .opt-btn { min-width: 34px; height:34px; font-size:12.5px; border-radius: 8px; }
 
   /* Ja/Nein */
   .yesno { display:flex; gap:10px; }
   .yesno input { display:none; }
-  .yesno .opt-btn { padding: 8px 18px; border:1.5px solid var(--border); border-radius:8px; cursor:pointer; font-weight:600; color:var(--gray); font-size:13px; transition: all .15s; }
+  .yesno .opt-btn { padding: 9px 20px; border:1.5px solid var(--border); border-radius:9px; cursor:pointer; font-weight:600; color:var(--ink-soft); font-size:13px; transition: all .15s; background: var(--white); }
   .yesno .opt-btn:hover { border-color: var(--blue-acc); color: var(--blue-mid); }
-  .yesno input:checked + .opt-btn { background: var(--blue-mid); border-color: var(--blue-mid); color:#fff; }
+  .yesno input:checked + .opt-btn { background: var(--blue-mid); border-color: var(--blue-mid); color:#fff; box-shadow: 0 4px 12px -2px rgba(227,0,126,.45); }
 
   /* Checkbox-Chips */
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chips input { display:none; }
-  .chips .chip { padding: 8px 14px; border:1.5px solid var(--border); border-radius:20px; cursor:pointer; font-size:12.5px; color:#374151; transition: all .15s; }
-  .chips .chip:hover { border-color: var(--blue-acc); }
-  .chips input:checked + .chip { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue-mid); font-weight:600; }
+  .chips .chip { padding: 9px 15px; border:1.5px solid var(--border); border-radius:20px; cursor:pointer; font-size:12.5px; color:var(--ink-soft); transition: all .15s; background: var(--white); }
+  .chips .chip:hover { border-color: var(--blue-acc); transform: translateY(-1px); }
+  .chips input:checked + .chip { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue-dark); font-weight:600; }
 
   textarea, input[type=text], input[type=email] {
-    width:100%; border:1.5px solid var(--border); border-radius:8px; padding:10px 12px;
-    font-size:13.5px; font-family:inherit; color:#1F2937; resize:vertical;
+    width:100%; border:1.5px solid var(--border); border-radius:9px; padding:11px 13px;
+    font-size:13.5px; font-family:inherit; color:var(--ink); resize:vertical; background: var(--white);
+    transition: border-color .15s, box-shadow .15s;
   }
-  textarea:focus, input:focus { outline:none; border-color: var(--blue-acc); }
+  textarea:focus, input:focus { outline:none; border-color: var(--blue-acc); box-shadow: 0 0 0 3px var(--blue-light); }
   .two-col-inputs { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   @media (max-width:520px) { .two-col-inputs { grid-template-columns:1fr; } }
 
-  .footer-actions { padding: 24px 28px 28px; text-align:center; }
+  .footer-actions { padding: 26px 28px 30px; text-align:center; }
   .btn-submit {
-    background: var(--blue-mid); color:#fff; border:none; border-radius:9px; padding:13px 40px;
-    font-size:14.5px; font-weight:700; cursor:pointer; box-shadow: var(--shadow); transition: background .15s;
+    background: linear-gradient(135deg, var(--blue-mid), var(--blue-dark)); color:#fff; border:none; border-radius:10px; padding:14px 44px;
+    font-size:14.5px; font-weight:700; cursor:pointer; box-shadow: 0 10px 24px -8px rgba(126,0,70,.5); transition: transform .15s, box-shadow .15s;
   }
-  .btn-submit:hover { background: var(--blue-dark); }
-  .footer-note { color: var(--gray); font-size:11.5px; margin-top:12px; }
+  .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -8px rgba(126,0,70,.55); }
+  .btn-submit:disabled { opacity: .7; cursor: default; transform: none; }
+  .footer-note { color: var(--ink-faint); font-size:11.5px; margin-top:14px; }
 
-  .required-mark { color:#DC2626; }
+  .required-mark { color:var(--red); }
 
   /* Danke-Ansicht */
-  #thanks { display:none; background:var(--white); border-radius:12px; box-shadow: var(--shadow-lg); padding:40px 28px; text-align:center; }
-  #thanks .check { width:56px; height:56px; border-radius:50%; background:#F0FDF4; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
-  #thanks h2 { color: var(--blue-dark); font-size:19px; margin-bottom:8px; }
-  #thanks p { color:#374151; font-size:13.5px; max-width:440px; margin:0 auto; }
-  #thanks .fallback { margin-top:22px; text-align:left; background:var(--gray-light); border-radius:9px; padding:16px; display:none; }
+  #thanks { display:none; background:var(--white); border-radius:16px; box-shadow: var(--shadow-lg); padding:44px 28px; text-align:center; }
+  #thanks .check { width:60px; height:60px; border-radius:50%; background:#EAFAF0; display:flex; align-items:center; justify-content:center; margin:0 auto 18px; }
+  #thanks h2 { color: var(--ink); font-size:20px; margin-bottom:9px; }
+  #thanks p { color:var(--ink-soft); font-size:13.5px; max-width:440px; margin:0 auto; }
+  #thanks .fallback { margin-top:24px; text-align:left; background:var(--paper); border-radius:10px; padding:16px; display:none; }
   #thanks .fallback.show { display:block; }
-  #thanks .fallback p.hint { color:var(--gray); font-size:12px; margin-bottom:8px; }
+  #thanks .fallback p.hint { color:var(--ink-faint); font-size:12px; margin-bottom:8px; }
   #thanks textarea { min-height:160px; font-size:12px; background:#fff; }
-  #thanks .copy-row { display:flex; gap:10px; margin-top:10px; }
-  .btn-secondary { background:var(--white); color:var(--blue-mid); border:1.5px solid var(--blue-mid); border-radius:8px; padding:8px 16px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  #thanks .copy-row { display:flex; gap:10px; margin-top:10px; flex-wrap: wrap; }
+  .btn-secondary { background:var(--white); color:var(--blue-mid); border:1.5px solid var(--blue-mid); border-radius:9px; padding:9px 16px; font-size:12.5px; font-weight:600; cursor:pointer; transition: background .15s; }
   .btn-secondary:hover { background: var(--blue-light); }
 
-  .page-footer { text-align:center; color:var(--gray); font-size:11.5px; margin-top:18px; }
+  .page-footer { text-align:center; color:var(--ink-faint); font-size:11.5px; margin-top:20px; }
 </style>
 </head>
 <body>
 <div class="wrap">
 
+  <div class="progress-rail" id="progress-rail" style="display:none">
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-label"><span id="progress-text">0 von 13 beantwortet</span><span>Kundenumfrage eurotel</span></div>
+  </div>
+
   <div id="survey-view">
     <div class="header">
-      <h1>🌐 Kundenumfrage – eurotel</h1>
-      <div class="sub">Autorisierter Webfleet-Partner</div>
-      <span class="badge">⏱️ dauert nur ca. 3 Minuten</span>
+      <div class="header-top">
+        <div class="brand-mark">e</div>
+        <div>
+          <h1>Kundenumfrage</h1>
+          <div class="sub">eurotel · Autorisierter Webfleet-Partner</div>
+        </div>
+      </div>
+      <span class="badge">⏱ dauert nur ca. 3 Minuten</span>
     </div>
     <div class="intro">
       <p>Vielen Dank, dass Sie sich einen Moment Zeit nehmen! Ihre Meinung hilft uns, unseren Service, unsere Produkte und unsere Zusammenarbeit stetig zu verbessern.</p>
@@ -294,11 +347,11 @@
     </div>
   </div>
 
-  <div class="page-footer">eurotel GmbH & Co. KG · Schulstraße 3 · 56291 Bickenbach · [E-Mail eintragen] · [Telefon eintragen]</div>
+  <div class="page-footer">eurotel GmbH & Co. KG · Schulstraße 3 · 56291 Bickenbach · service@euro-tel.net · +49 (0)6746 800020</div>
 </div>
 
 <script>
-const SURVEY_EMAIL = 'REPLACE_WITH_EUROTEL_EMAIL'; // TODO: echte eurotel-Support-E-Mail eintragen
+const SURVEY_EMAIL = 'service@euro-tel.net';
 const SUPABASE_URL = 'https://xwnprohgxzzrxwkpwpxk.supabase.co';
 const SUPABASE_KEY  = 'sb_publishable_e5AdnOmI4muh50aDJKb58A_lOjWHfrt';
 let lastMailto = '';
@@ -402,6 +455,7 @@ async function submitSurvey(evt) {
   }
 
   document.getElementById('survey-view').style.display = 'none';
+  document.getElementById('progress-rail').style.display = 'none';
   document.getElementById('thanks').style.display = 'block';
 
   if (savedDirectly) {
@@ -431,6 +485,44 @@ function copyFallback() {
     document.execCommand('copy');
   }
 }
+
+// ── Fortschrittsanzeige ──
+const PROGRESS_FIELDS = [
+  { type: 'radio', name: 'gesamtzufriedenheit' },
+  { type: 'radio', name: 'webfleet_bedienung' },
+  { type: 'radio', name: 'app_nutzung' },
+  { type: 'checkbox', name: 'funktionen' },
+  { type: 'radio', name: 'support_reaktionszeit' },
+  { type: 'radio', name: 'support_kompetenz' },
+  { type: 'checkbox', name: 'zusatzleistungen' },
+  { type: 'text', id: 'loesungssuche' },
+  { type: 'radio', name: 'nps' },
+  { type: 'text', id: 'freitext' },
+  { type: 'text', id: 'kontakt-firma' },
+  { type: 'text', id: 'kontakt-name' },
+  { type: 'text', id: 'kontakt-email' },
+];
+function updateProgress() {
+  const form = document.getElementById('survey-form');
+  let answered = 0;
+  for (const f of PROGRESS_FIELDS) {
+    if (f.type === 'text') {
+      if (document.getElementById(f.id).value.trim()) answered++;
+    } else {
+      if (form.querySelector(`input[name="${f.name}"]:checked`)) answered++;
+    }
+  }
+  const pct = Math.round((answered / PROGRESS_FIELDS.length) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent = `${answered} von ${PROGRESS_FIELDS.length} beantwortet`;
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('survey-form');
+  document.getElementById('progress-rail').style.display = '';
+  form.addEventListener('change', updateProgress);
+  form.addEventListener('input', updateProgress);
+  updateProgress();
+});
 </script>
 </body>
 </html>
