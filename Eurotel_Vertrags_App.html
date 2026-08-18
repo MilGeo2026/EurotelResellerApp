@@ -552,6 +552,18 @@
           </div>
         </div>
 
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <span class="card-title">Webfleet-E-Mails → Tickets</span>
+            <button class="btn btn-secondary btn-sm" onclick="checkWebfleetMails(false)">E-Mails prüfen</button>
+          </div>
+          <div id="webfleet-mail-status" style="font-size:12.5px;color:var(--gray)">Noch nicht geprüft – auf „E-Mails prüfen" klicken (Outlook muss verbunden sein, siehe unten links).</div>
+          <div id="webfleet-mail-list" style="margin-top:10px"></div>
+          <div id="webfleet-mail-actions" style="display:none;margin-top:12px;text-align:right">
+            <button class="btn btn-primary btn-sm" onclick="createTicketsFromSelectedWebfleetMails()">Ausgewählte als Tickets anlegen</button>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <span class="card-title">Ticketliste</span>
@@ -900,11 +912,11 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //      - Kontotypen: „Nur Konten in diesem Organisationsverzeichnis" (euro-tel.net) oder „Multi-Tenant", je nach Bedarf
 //      - Plattform: „Single-page application (SPA)", Redirect-URI: die URL, unter der diese App läuft
 //        (z. B. https://milgeo2026.github.io/EurotelResellerApp/ und ggf. http://localhost:xxxx für Tests)
-//   2. Unter „API-Berechtigungen" → „Berechtigung hinzufügen" → Microsoft Graph → Delegiert → Mail.Send, User.Read
+//   2. Unter „API-Berechtigungen" → „Berechtigung hinzufügen" → Microsoft Graph → Delegiert → Mail.Send, Mail.Read, User.Read
 //   3. Die „Anwendungs-ID (Client)" von der Übersichtsseite unten eintragen:
 const MSAL_CLIENT_ID = '0e680a42-c84c-4d06-a844-a81b372c011a';
 const MSAL_TENANT     = 'euro-tel.net'; // Single-Tenant-Registrierung: nur Konten aus eurem Microsoft-365-Tenant
-const MSAL_SCOPES     = ['Mail.Send', 'User.Read'];
+const MSAL_SCOPES     = ['Mail.Send', 'Mail.Read', 'User.Read'];
 
 let msalInstance = null;
 let msalInitPromise = null;
@@ -1213,6 +1225,7 @@ function showPage(id) {
   currentPage = id;
   refreshAll();
   closeSidebar();
+  if (id === 'tickets') checkWebfleetMails(false);
 }
 
 let currentPage = 'dashboard';
@@ -1799,6 +1812,92 @@ async function updateTicketStatus(id, status) {
   const { error } = await sb.from('tickets').update({ data: merged }).eq('id', id);
   if (error) { alert('Fehler beim Aktualisieren: ' + error.message); refreshAll(); return; }
   tickets[idx] = { id, created_at: tickets[idx].created_at, ...merged };
+  refreshAll();
+}
+
+// ══════════════════════════════════════════════════
+//  WEBFLEET-E-MAILS → TICKETS (über Outlook / Microsoft Graph)
+// ══════════════════════════════════════════════════
+const WEBFLEET_SENDER_DOMAINS = ['webfleet.com', 'bridgestone-mobility.com'];
+let webfleetMailCandidates = [];
+
+async function checkWebfleetMails(manual = true) {
+  const statusEl = document.getElementById('webfleet-mail-status');
+  const listEl = document.getElementById('webfleet-mail-list');
+  const actionsEl = document.getElementById('webfleet-mail-actions');
+  listEl.innerHTML = '';
+  actionsEl.style.display = 'none';
+
+  // Automatischer Check beim Seitenaufruf löst nie ein Login-Popup aus –
+  // nur der Klick auf "E-Mails prüfen" darf das (siehe getGraphAccessToken).
+  const inst = msalReady() ? await ensureMsalInitialized() : null;
+  const connected = !!(msalAccount || inst?.getActiveAccount() || inst?.getAllAccounts()[0]);
+  if (!connected) {
+    statusEl.textContent = 'Nicht mit Outlook verbunden – bitte unten links auf „Verbinden" klicken, dann hier erneut prüfen.';
+    return;
+  }
+
+  statusEl.textContent = 'Prüfe Postfach …';
+  try {
+    const token = await getGraphAccessToken();
+    const searchExpr = WEBFLEET_SENDER_DOMAINS.map(d => `from:${d}`).join(' OR ');
+    const url = `https://graph.microsoft.com/v1.0/me/messages?$search="${encodeURIComponent(searchExpr)}"&$top=25&$select=id,subject,from,receivedDateTime,bodyPreview`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Graph API Fehler (${res.status}): ${errText || res.statusText}`);
+    }
+    const json = await res.json();
+    const found = (json.value || []).sort((a, b) => (b.receivedDateTime || '').localeCompare(a.receivedDateTime || ''));
+    const existingIds = new Set(tickets.map(t => t.webfleetMailId).filter(Boolean));
+    webfleetMailCandidates = found.filter(m => !existingIds.has(m.id));
+
+    if (!found.length) { statusEl.textContent = 'Keine Webfleet-E-Mails im Postfach gefunden.'; return; }
+    if (!webfleetMailCandidates.length) { statusEl.textContent = `Alle ${found.length} gefundenen Webfleet-E-Mails sind bereits als Ticket angelegt.`; return; }
+
+    statusEl.textContent = `${webfleetMailCandidates.length} neue Webfleet-E-Mail(s) gefunden – bitte auswählen und Tickets anlegen:`;
+    listEl.innerHTML = webfleetMailCandidates.map((m, i) => `
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" class="webfleet-mail-cb" data-idx="${i}" checked style="margin-top:3px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px">${esc(m.subject || '(kein Betreff)')}</div>
+          <div style="font-size:11px;color:var(--gray)">${esc(m.from?.emailAddress?.address || '')} · ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : ''}</div>
+          <div style="font-size:12px;color:var(--gray);margin-top:4px">${esc((m.bodyPreview || '').slice(0, 160))}</div>
+        </div>
+      </label>`).join('');
+    actionsEl.style.display = 'block';
+  } catch (e) {
+    statusEl.textContent = manual ? ('Fehler beim Prüfen: ' + e.message) : 'Nicht geprüft (Outlook-Verbindung nicht bereit).';
+  }
+}
+
+async function createTicketsFromSelectedWebfleetMails() {
+  const checked = Array.from(document.querySelectorAll('.webfleet-mail-cb:checked'));
+  if (!checked.length) { alert('Bitte mindestens eine E-Mail auswählen.'); return; }
+  let created = 0;
+  for (const cb of checked) {
+    const m = webfleetMailCandidates[+cb.dataset.idx];
+    if (!m) continue;
+    const senderEmail = m.from?.emailAddress?.address || '';
+    const data = {
+      titel: m.subject || 'Webfleet-E-Mail ohne Betreff',
+      ticketnr: '',
+      kundeId: null,
+      kategorie: 'Software',
+      prioritaet: 'mittel',
+      status: 'offen',
+      beschreibung: (m.bodyPreview || '').trim() + `\n\n(Automatisch aus Webfleet-E-Mail importiert, Absender: ${senderEmail}, Eingang: ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : '–'})`,
+      webfleetMailId: m.id,
+      verlauf: [verlaufEintrag('Ticket automatisch aus Webfleet-E-Mail erstellt')],
+    };
+    const { data: inserted, error } = await sb.from('tickets').insert({ data }).select().single();
+    if (error) { alert(`Fehler beim Anlegen von "${data.titel}": ` + error.message); continue; }
+    tickets.unshift({ id: inserted.id, created_at: inserted.created_at, ...data });
+    created++;
+  }
+  document.getElementById('webfleet-mail-status').textContent = created ? `${created} Ticket(s) angelegt.` : 'Keine Tickets angelegt.';
+  document.getElementById('webfleet-mail-list').innerHTML = '';
+  document.getElementById('webfleet-mail-actions').style.display = 'none';
   refreshAll();
 }
 
