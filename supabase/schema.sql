@@ -69,3 +69,37 @@ create policy "Nur angemeldete Nutzer duerfen aendern"
 on public.tickets for update to authenticated using (true) with check (true);
 create policy "Nur angemeldete Nutzer duerfen loeschen"
 on public.tickets for delete to authenticated using (true);
+
+-- ── Kündigungen (automatisch aus Webfleet-E-Mails "Kündigung von WEBFLEET") ──
+create table if not exists public.kuendigungen (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  data jsonb not null
+);
+alter table public.kuendigungen enable row level security;
+
+create policy "Nur angemeldete Nutzer duerfen lesen"
+on public.kuendigungen for select to authenticated using (true);
+create policy "Nur angemeldete Nutzer duerfen anlegen"
+on public.kuendigungen for insert to authenticated with check (true);
+create policy "Nur angemeldete Nutzer duerfen aendern"
+on public.kuendigungen for update to authenticated using (true) with check (true);
+create policy "Nur angemeldete Nutzer duerfen loeschen"
+on public.kuendigungen for delete to authenticated using (true);
+
+-- ── Vertragsaktivierungen (automatisch aus E-Mails "Vertragsbestätigung/Produktaktivierung") ──
+create table if not exists public.vertragsaktivierungen (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  data jsonb not null
+);
+alter table public.vertragsaktivierungen enable row level security;
+
+create policy "Nur angemeldete Nutzer duerfen lesen"
+on public.vertragsaktivierungen for select to authenticated using (true);
+create policy "Nur angemeldete Nutzer duerfen anlegen"
+on public.vertragsaktivierungen for insert to authenticated with check (true);
+create policy "Nur angemeldete Nutzer duerfen aendern"
+on public.vertragsaktivierungen for update to authenticated using (true) with check (true);
+create policy "Nur angemeldete Nutzer duerfen loeschen"
+on public.vertragsaktivierungen for delete to authenticated using (true);

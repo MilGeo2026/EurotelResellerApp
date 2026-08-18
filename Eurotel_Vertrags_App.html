@@ -333,6 +333,10 @@
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6h.008v.008H6V6z"/></svg>
         <span class="nav-label">Tickets</span>
       </div>
+      <div class="nav-item" data-page="vertragsereignisse" onclick="showPage('vertragsereignisse')" title="Vertragsereignisse">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span class="nav-label">Vertragsereignisse</span>
+      </div>
       <a class="nav-item" href="umfrage.html" target="_blank" rel="noopener" title="Kundenumfrage öffnen (neuer Tab)">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h3m-3-8h6M5 5h14a1 1 0 011 1v12a1 1 0 01-1 1H8l-4 3V6a1 1 0 011-1z"/></svg>
         <span class="nav-label">Kundenumfrage</span>
@@ -587,6 +591,59 @@
                 </tr>
               </thead>
               <tbody id="tickets-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ VERTRAGSEREIGNISSE (Kündigungen & Aktivierungen aus E-Mail) ══ -->
+      <div class="page" id="page-vertragsereignisse">
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <span class="card-title">Kündigungen</span>
+            <button class="btn btn-secondary btn-sm" onclick="checkVertragsereignisMails('kuendigung', true)">E-Mails prüfen</button>
+          </div>
+          <div id="ve-kuendigung-status" style="font-size:12.5px;color:var(--gray)">Noch nicht geprüft – auf „E-Mails prüfen" klicken (Outlook muss verbunden sein, siehe unten links).</div>
+          <div id="ve-kuendigung-list" style="margin-top:10px"></div>
+          <div id="ve-kuendigung-actions" style="display:none;margin:12px 0;text-align:right">
+            <button class="btn btn-primary btn-sm" onclick="createVertragsereignisseFromSelection('kuendigung')">Ausgewählte übernehmen</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:16%">Kundennummer</th>
+                  <th style="width:50%">Betreff</th>
+                  <th style="width:20%">Eingegangen</th>
+                  <th style="width:14%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="ve-kuendigung-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Vertragsaktivierungen</span>
+            <button class="btn btn-secondary btn-sm" onclick="checkVertragsereignisMails('aktivierung', true)">E-Mails prüfen</button>
+          </div>
+          <div id="ve-aktivierung-status" style="font-size:12.5px;color:var(--gray)">Noch nicht geprüft – auf „E-Mails prüfen" klicken (Outlook muss verbunden sein, siehe unten links).</div>
+          <div id="ve-aktivierung-list" style="margin-top:10px"></div>
+          <div id="ve-aktivierung-actions" style="display:none;margin:12px 0;text-align:right">
+            <button class="btn btn-primary btn-sm" onclick="createVertragsereignisseFromSelection('aktivierung')">Ausgewählte übernehmen</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table class="table-fixed">
+              <thead>
+                <tr>
+                  <th style="width:16%">Kundennummer</th>
+                  <th style="width:50%">Betreff</th>
+                  <th style="width:20%">Eingegangen</th>
+                  <th style="width:14%">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="ve-aktivierung-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -1196,6 +1253,7 @@ async function loadData() {
   } else {
     tickets = (tRows || []).map(r => ({ id: r.id, created_at: r.created_at, ...r.data }));
   }
+  loadVertragsereignisse();
   refreshAll();
 }
 
@@ -1208,6 +1266,7 @@ const pageConfig = {
   vertraege:  { title: 'Verträge',     badge: 'Vertragsliste',btn: '+ Neuer Vertrag' },
   umfrageergebnisse: { title: 'Umfrage-Ergebnisse', badge: 'Kundenfeedback', btn: null },
   tickets:    { title: 'Tickets',      badge: 'Support-Tickets', btn: '+ Neues Ticket' },
+  vertragsereignisse: { title: 'Vertragsereignisse', badge: 'Kündigungen & Aktivierungen', btn: null },
 };
 
 function showPage(id) {
@@ -1226,6 +1285,7 @@ function showPage(id) {
   refreshAll();
   closeSidebar();
   if (id === 'tickets') checkWebfleetMails(false);
+  if (id === 'vertragsereignisse') { checkVertragsereignisMails('kuendigung', false); checkVertragsereignisMails('aktivierung', false); }
 }
 
 let currentPage = 'dashboard';
@@ -1907,6 +1967,143 @@ async function deleteTicket(id) {
   if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
   tickets = tickets.filter(t => t.id !== id);
   refreshAll();
+}
+
+// ══════════════════════════════════════════════════
+//  VERTRAGSEREIGNISSE (Kündigungen & Vertragsaktivierungen aus E-Mail)
+// ══════════════════════════════════════════════════
+const VERTRAGSEREIGNIS_TYPES = {
+  kuendigung:   { table: 'kuendigungen',          subjectMatch: 'Kündigung von WEBFLEET',              label: 'Kündigung' },
+  aktivierung:  { table: 'vertragsaktivierungen', subjectMatch: 'Vertragsbestätigung/Produktaktivierung', label: 'Vertragsaktivierung' },
+};
+
+let vertragsereignisListen     = { kuendigung: [], aktivierung: [] };
+let vertragsereignisCandidates = { kuendigung: [], aktivierung: [] };
+
+// Kundennummer steht laut Vorgabe immer in der Klammer hinter dem Betreff,
+// z. B. "Kündigung von WEBFLEET (12345)".
+function extractKundennummer(subject) {
+  const m = (subject || '').match(/\(([^)]+)\)\s*$/);
+  return m ? m[1].trim() : '';
+}
+
+async function checkVertragsereignisMails(type, manual = true) {
+  const cfg = VERTRAGSEREIGNIS_TYPES[type];
+  const statusEl  = document.getElementById(`ve-${type}-status`);
+  const listEl    = document.getElementById(`ve-${type}-list`);
+  const actionsEl = document.getElementById(`ve-${type}-actions`);
+  listEl.innerHTML = '';
+  actionsEl.style.display = 'none';
+
+  const inst = msalReady() ? await ensureMsalInitialized() : null;
+  const connected = !!(msalAccount || inst?.getActiveAccount() || inst?.getAllAccounts()[0]);
+  if (!connected) {
+    statusEl.textContent = 'Nicht mit Outlook verbunden – bitte unten links auf „Verbinden" klicken, dann hier erneut prüfen.';
+    return;
+  }
+
+  statusEl.textContent = 'Prüfe Postfach …';
+  try {
+    const token = await getGraphAccessToken();
+    const searchExpr = `subject:'${cfg.subjectMatch}'`;
+    const url = `https://graph.microsoft.com/v1.0/me/messages?$search="${encodeURIComponent(searchExpr)}"&$top=25&$select=id,subject,from,receivedDateTime`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Graph API Fehler (${res.status}): ${errText || res.statusText}`);
+    }
+    const json = await res.json();
+    const found = (json.value || [])
+      .filter(m => (m.subject || '').includes(cfg.subjectMatch))
+      .sort((a, b) => (b.receivedDateTime || '').localeCompare(a.receivedDateTime || ''));
+    const existingIds = new Set((vertragsereignisListen[type] || []).map(x => x.mailId).filter(Boolean));
+    vertragsereignisCandidates[type] = found.filter(m => !existingIds.has(m.id));
+
+    if (!found.length) { statusEl.textContent = `Keine "${cfg.subjectMatch}"-E-Mails im Postfach gefunden.`; return; }
+    if (!vertragsereignisCandidates[type].length) { statusEl.textContent = `Alle ${found.length} gefundenen E-Mails sind bereits erfasst.`; return; }
+
+    statusEl.textContent = `${vertragsereignisCandidates[type].length} neue ${cfg.label}(en) gefunden – bitte auswählen:`;
+    listEl.innerHTML = vertragsereignisCandidates[type].map((m, i) => {
+      const kdnr = extractKundennummer(m.subject);
+      return `
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" class="ve-${type}-cb" data-idx="${i}" checked style="margin-top:3px;width:16px;flex:none;padding:0;border:none;background:none">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px">${esc(m.subject || '(kein Betreff)')}</div>
+          <div style="font-size:11px;color:var(--gray)">Kundennummer: <strong>${esc(kdnr || '– nicht gefunden –')}</strong> · ${esc(m.from?.emailAddress?.address || '')} · ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : ''}</div>
+        </div>
+      </label>`;
+    }).join('');
+    actionsEl.style.display = 'block';
+  } catch (e) {
+    statusEl.textContent = manual ? ('Fehler beim Prüfen: ' + e.message) : 'Nicht geprüft (Outlook-Verbindung nicht bereit).';
+  }
+}
+
+async function createVertragsereignisseFromSelection(type) {
+  const cfg = VERTRAGSEREIGNIS_TYPES[type];
+  const checked = Array.from(document.querySelectorAll(`.ve-${type}-cb:checked`));
+  if (!checked.length) { alert('Bitte mindestens eine E-Mail auswählen.'); return; }
+  let created = 0;
+  for (const cb of checked) {
+    const m = vertragsereignisCandidates[type][+cb.dataset.idx];
+    if (!m) continue;
+    const data = {
+      betreff:      m.subject || '',
+      kundennummer: extractKundennummer(m.subject),
+      absender:     m.from?.emailAddress?.address || '',
+      eingegangen:  m.receivedDateTime || null,
+      mailId:       m.id,
+    };
+    const { data: inserted, error } = await sb.from(cfg.table).insert({ data }).select().single();
+    if (error) { alert('Fehler beim Anlegen: ' + error.message); continue; }
+    vertragsereignisListen[type].unshift({ id: inserted.id, created_at: inserted.created_at, ...data });
+    created++;
+  }
+  document.getElementById(`ve-${type}-status`).textContent = created ? `${created} Eintrag/Einträge übernommen.` : 'Nichts übernommen.';
+  document.getElementById(`ve-${type}-list`).innerHTML = '';
+  document.getElementById(`ve-${type}-actions`).style.display = 'none';
+  renderVertragsereignisTabelle(type);
+}
+
+function renderVertragsereignisTabelle(type) {
+  const tbody = document.getElementById(`ve-${type}-tbody`);
+  if (!tbody) return;
+  const list = vertragsereignisListen[type] || [];
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty" style="padding:20px;text-align:center;color:var(--gray)">Noch keine Einträge</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(e => `<tr>
+    <td><strong>${esc(e.kundennummer || '–')}</strong></td>
+    <td>${esc(e.betreff || '–')}</td>
+    <td>${e.eingegangen ? new Date(e.eingegangen).toLocaleString('de-DE') : '–'}</td>
+    <td><div class="td-actions"><button class="btn btn-danger btn-sm" onclick="deleteVertragsereignis('${type}','${e.id}')">🗑</button></div></td>
+  </tr>`).join('');
+}
+
+async function deleteVertragsereignis(type, id) {
+  if (!confirm('Eintrag wirklich löschen?')) return;
+  const cfg = VERTRAGSEREIGNIS_TYPES[type];
+  const { error } = await sb.from(cfg.table).delete().eq('id', id);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  vertragsereignisListen[type] = vertragsereignisListen[type].filter(x => x.id !== id);
+  renderVertragsereignisTabelle(type);
+}
+
+async function loadVertragsereignisse() {
+  for (const type of Object.keys(VERTRAGSEREIGNIS_TYPES)) {
+    const cfg = VERTRAGSEREIGNIS_TYPES[type];
+    const { data, error } = await sb.from(cfg.table).select('*').order('created_at', { ascending: false });
+    if (error) {
+      // Tabelle evtl. noch nicht angelegt (siehe supabase/schema.sql) – Liste bleibt dann leer.
+      vertragsereignisListen[type] = [];
+      console.warn(`${cfg.table} konnte nicht geladen werden:`, error.message);
+    } else {
+      vertragsereignisListen[type] = (data || []).map(r => ({ id: r.id, created_at: r.created_at, ...r.data }));
+    }
+    renderVertragsereignisTabelle(type);
+  }
 }
 
 function createTicketFromUmfrage(id) {
