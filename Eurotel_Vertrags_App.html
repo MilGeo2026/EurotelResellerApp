@@ -878,6 +878,7 @@
     <div class="modal-body" id="umfrage-detail-body"></div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-umfrage-detail')">Schließen</button>
+      <button class="btn btn-primary" id="umfrage-detail-mail-btn">✉ Per E-Mail antworten</button>
       <button class="btn btn-primary" id="umfrage-detail-ticket-btn">🎫 Ticket erstellen</button>
     </div>
   </div>
@@ -1652,7 +1653,20 @@ function showUmfrageDetail(id) {
       </div>
     </div>`;
   document.getElementById('umfrage-detail-ticket-btn').onclick = () => createTicketFromUmfrage(id);
+  document.getElementById('umfrage-detail-mail-btn').onclick = () => sendUmfrageAntwortMail(id);
   openModal('modal-umfrage-detail');
+}
+
+function sendUmfrageAntwortMail(id) {
+  const a = umfrageAntworten.find(x => x.id === id);
+  if (!a) return;
+  if (!a.kontakt_email) { alert('Für diese Umfrage-Antwort wurde keine E-Mail-Adresse angegeben – es kann nicht direkt geantwortet werden.'); return; }
+  const zitat = a.freitext ? `Vielen Dank für Ihr Feedback:\n„${a.freitext}"\n\n` : '';
+  openEmailModal({
+    to: a.kontakt_email,
+    subject: `Ihr Feedback zur eurotel Webfleet-Kundenumfrage${a.kontakt_firma ? ' – ' + a.kontakt_firma : ''}`,
+    body: `Sehr geehrte(r) ${a.kontakt_name || ''},\n\nvielen Dank, dass Sie sich Zeit für unsere Kundenumfrage genommen haben.\n\n${zitat}Mit freundlichen Grüßen\nIhr eurotel Team`,
+  });
 }
 
 async function deleteUmfrageAntwort(id) {
