@@ -103,3 +103,18 @@ create policy "Nur angemeldete Nutzer duerfen aendern"
 on public.vertragsaktivierungen for update to authenticated using (true) with check (true);
 create policy "Nur angemeldete Nutzer duerfen loeschen"
 on public.vertragsaktivierungen for delete to authenticated using (true);
+
+-- ── Ignorierte Webfleet-E-Mails (bewusst NICHT als Ticket angelegt) ──
+create table if not exists public.ignorierte_webfleet_mails (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  data jsonb not null
+);
+alter table public.ignorierte_webfleet_mails enable row level security;
+
+create policy "Nur angemeldete Nutzer duerfen lesen"
+on public.ignorierte_webfleet_mails for select to authenticated using (true);
+create policy "Nur angemeldete Nutzer duerfen anlegen"
+on public.ignorierte_webfleet_mails for insert to authenticated with check (true);
+create policy "Nur angemeldete Nutzer duerfen loeschen"
+on public.ignorierte_webfleet_mails for delete to authenticated using (true);

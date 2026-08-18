@@ -564,6 +564,7 @@
           <div id="webfleet-mail-status" style="font-size:12.5px;color:var(--gray)">Noch nicht geprüft – auf „E-Mails prüfen" klicken (Outlook muss verbunden sein, siehe unten links).</div>
           <div id="webfleet-mail-list" style="margin-top:10px"></div>
           <div id="webfleet-mail-actions" style="display:none;margin-top:12px;text-align:right">
+            <button class="btn btn-secondary btn-sm" onclick="ignoreSelectedWebfleetMails()">Ausgewählte ignorieren</button>
             <button class="btn btn-primary btn-sm" onclick="createTicketsFromSelectedWebfleetMails()">Ausgewählte als Tickets anlegen</button>
           </div>
         </div>
@@ -1260,6 +1261,7 @@ async function loadData() {
     tickets = (tRows || []).map(r => ({ id: r.id, created_at: r.created_at, ...r.data }));
   }
   loadVertragsereignisse();
+  loadIgnoredWebfleetMails();
   refreshAll();
 }
 
@@ -1886,6 +1888,18 @@ async function updateTicketStatus(id, status) {
 // ══════════════════════════════════════════════════
 const WEBFLEET_SENDER_DOMAINS = ['webfleet.com', 'bridgestone-mobility.com'];
 let webfleetMailCandidates = [];
+let ignoredWebfleetMailIds = new Set();
+
+async function loadIgnoredWebfleetMails() {
+  const { data, error } = await sb.from('ignorierte_webfleet_mails').select('data');
+  if (error) {
+    // Tabelle evtl. noch nicht angelegt (siehe supabase/schema.sql).
+    ignoredWebfleetMailIds = new Set();
+    console.warn('ignorierte_webfleet_mails konnte nicht geladen werden:', error.message);
+    return;
+  }
+  ignoredWebfleetMailIds = new Set((data || []).map(r => r.data?.mailId).filter(Boolean));
+}
 
 async function checkWebfleetMails(manual = true) {
   const statusEl = document.getElementById('webfleet-mail-status');
@@ -1916,10 +1930,10 @@ async function checkWebfleetMails(manual = true) {
     const json = await res.json();
     const found = (json.value || []).sort((a, b) => (b.receivedDateTime || '').localeCompare(a.receivedDateTime || ''));
     const existingIds = new Set(tickets.map(t => t.webfleetMailId).filter(Boolean));
-    webfleetMailCandidates = found.filter(m => !existingIds.has(m.id));
+    webfleetMailCandidates = found.filter(m => !existingIds.has(m.id) && !ignoredWebfleetMailIds.has(m.id));
 
     if (!found.length) { statusEl.textContent = 'Keine Webfleet-E-Mails im Postfach gefunden.'; return; }
-    if (!webfleetMailCandidates.length) { statusEl.textContent = `Alle ${found.length} gefundenen Webfleet-E-Mails sind bereits als Ticket angelegt.`; return; }
+    if (!webfleetMailCandidates.length) { statusEl.textContent = `Alle ${found.length} gefundenen Webfleet-E-Mails sind bereits als Ticket angelegt oder ignoriert.`; return; }
 
     statusEl.textContent = `${webfleetMailCandidates.length} neue Webfleet-E-Mail(s) gefunden – bitte auswählen und Tickets anlegen:`;
     listEl.innerHTML = webfleetMailCandidates.map((m, i) => `
@@ -1965,6 +1979,25 @@ async function createTicketsFromSelectedWebfleetMails() {
   document.getElementById('webfleet-mail-list').innerHTML = '';
   document.getElementById('webfleet-mail-actions').style.display = 'none';
   refreshAll();
+}
+
+async function ignoreSelectedWebfleetMails() {
+  const checked = Array.from(document.querySelectorAll('.webfleet-mail-cb:checked'));
+  if (!checked.length) { alert('Bitte mindestens eine E-Mail auswählen.'); return; }
+  if (!confirm(`${checked.length} E-Mail(s) ignorieren? Sie werden nicht mehr als Vorschlag für ein Ticket angezeigt.`)) return;
+  let ignored = 0;
+  for (const cb of checked) {
+    const m = webfleetMailCandidates[+cb.dataset.idx];
+    if (!m) continue;
+    const data = { mailId: m.id, betreff: m.subject || '', ignoriert_am: new Date().toISOString() };
+    const { error } = await sb.from('ignorierte_webfleet_mails').insert({ data });
+    if (error) { alert(`Fehler beim Ignorieren von "${data.betreff}": ` + error.message); continue; }
+    ignoredWebfleetMailIds.add(m.id);
+    ignored++;
+  }
+  document.getElementById('webfleet-mail-status').textContent = ignored ? `${ignored} E-Mail(s) ignoriert – werden künftig nicht mehr vorgeschlagen.` : 'Nichts ignoriert.';
+  document.getElementById('webfleet-mail-list').innerHTML = '';
+  document.getElementById('webfleet-mail-actions').style.display = 'none';
 }
 
 async function deleteTicket(id) {
