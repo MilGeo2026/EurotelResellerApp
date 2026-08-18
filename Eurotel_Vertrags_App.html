@@ -1858,7 +1858,7 @@ async function checkWebfleetMails(manual = true) {
     statusEl.textContent = `${webfleetMailCandidates.length} neue Webfleet-E-Mail(s) gefunden – bitte auswählen und Tickets anlegen:`;
     listEl.innerHTML = webfleetMailCandidates.map((m, i) => `
       <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
-        <input type="checkbox" class="webfleet-mail-cb" data-idx="${i}" checked style="margin-top:3px">
+        <input type="checkbox" class="webfleet-mail-cb" data-idx="${i}" checked style="margin-top:3px;width:16px;flex:none;padding:0;border:none;background:none">
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px">${esc(m.subject || '(kein Betreff)')}</div>
           <div style="font-size:11px;color:var(--gray)">${esc(m.from?.emailAddress?.address || '')} · ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : ''}</div>
