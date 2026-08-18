@@ -901,8 +901,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //        (z. B. https://milgeo2026.github.io/EurotelResellerApp/ und ggf. http://localhost:xxxx für Tests)
 //   2. Unter „API-Berechtigungen" → „Berechtigung hinzufügen" → Microsoft Graph → Delegiert → Mail.Send, User.Read
 //   3. Die „Anwendungs-ID (Client)" von der Übersichtsseite unten eintragen:
-const MSAL_CLIENT_ID = ''; // TODO: Azure-AD Client-ID eintragen, siehe Anleitung oben
-const MSAL_TENANT     = 'common'; // 'common' = beliebiges Microsoft-Konto; alternativ eure Tenant-ID für euro-tel.net
+const MSAL_CLIENT_ID = '0e680a42-c84c-4d06-a844-a81b372c011a';
+const MSAL_TENANT     = 'euro-tel.net'; // Single-Tenant-Registrierung: nur Konten aus eurem Microsoft-365-Tenant
 const MSAL_SCOPES     = ['Mail.Send', 'User.Read'];
 
 let msalInstance = null;
