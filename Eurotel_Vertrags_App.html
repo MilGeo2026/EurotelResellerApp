@@ -906,13 +906,14 @@ const MSAL_TENANT     = 'euro-tel.net'; // Single-Tenant-Registrierung: nur Kont
 const MSAL_SCOPES     = ['Mail.Send', 'User.Read'];
 
 let msalInstance = null;
+let msalInitPromise = null;
 let msalAccount   = null;
 
 function msalReady() {
   return !!MSAL_CLIENT_ID && typeof msal !== 'undefined';
 }
 
-function getMsalInstance() {
+function createMsalInstance() {
   if (!msalInstance && msalReady()) {
     msalInstance = new msal.PublicClientApplication({
       auth: {
@@ -926,36 +927,48 @@ function getMsalInstance() {
   return msalInstance;
 }
 
+// MSAL v3 verlangt, dass initialize() abgeschlossen ist, bevor irgendeine
+// andere MSAL-API (auch nur getActiveAccount()) aufgerufen werden darf.
+async function ensureMsalInitialized() {
+  const inst = createMsalInstance();
+  if (!inst) return null;
+  if (!msalInitPromise) {
+    msalInitPromise = inst.initialize().catch(err => { msalInitPromise = null; throw err; });
+  }
+  await msalInitPromise;
+  return inst;
+}
+
 async function connectOutlook() {
   if (!MSAL_CLIENT_ID) {
     alert('Outlook-Anbindung ist noch nicht eingerichtet.\n\nEs fehlt die Azure-AD Client-ID (MSAL_CLIENT_ID) im Quellcode – siehe Kommentar über dieser Funktion für die Einrichtungsschritte.');
     return;
   }
   if (typeof msal === 'undefined') {
-    alert('Die Microsoft-Anmeldebibliothek (MSAL) konnte nicht geladen werden.\n\nDie Client-ID ist korrekt hinterlegt – vermutlich blockiert eine Firewall/ein Netzwerkfilter das Laden von https://alcdn.msauth.net. Bitte im Browser mit F12 → „Netzwerk" prüfen, ob diese Datei rot/fehlgeschlagen angezeigt wird, und ggf. eure IT bitten, die Domain alcdn.msauth.net freizugeben.');
+    alert('Die Microsoft-Anmeldebibliothek (MSAL) konnte nicht geladen werden.\n\nDie Client-ID ist korrekt hinterlegt – vermutlich blockiert eine Firewall/ein Netzwerkfilter das Laden von vendor/msal-browser.min.js. Bitte im Browser mit F12 → „Netzwerk" prüfen, ob diese Datei rot/fehlgeschlagen angezeigt wird.');
     return;
   }
-  const inst = getMsalInstance();
   try {
+    const inst = await ensureMsalInitialized();
     const result = await inst.loginPopup({ scopes: MSAL_SCOPES });
     msalAccount = result.account;
     inst.setActiveAccount(msalAccount);
-    updateOutlookStatusUI();
+    await updateOutlookStatusUI();
   } catch (e) {
     alert('Verbindung mit Outlook fehlgeschlagen: ' + e.message);
   }
 }
 
-function disconnectOutlook() {
-  const inst = getMsalInstance();
+async function disconnectOutlook() {
+  const inst = await ensureMsalInitialized();
   msalAccount = null;
   if (inst) inst.setActiveAccount(null);
-  updateOutlookStatusUI();
+  await updateOutlookStatusUI();
 }
 
 async function getGraphAccessToken() {
-  if (!msalReady()) throw new Error('Outlook-Anbindung ist nicht eingerichtet (Client-ID fehlt).');
-  const inst = getMsalInstance();
+  const inst = await ensureMsalInitialized();
+  if (!inst) throw new Error('Outlook-Anbindung ist nicht eingerichtet (Client-ID fehlt oder MSAL konnte nicht geladen werden).');
   const account = msalAccount || inst.getActiveAccount() || inst.getAllAccounts()[0];
   if (!account) throw new Error('Nicht mit Outlook verbunden. Bitte zuerst verbinden.');
   msalAccount = account;
@@ -968,11 +981,11 @@ async function getGraphAccessToken() {
   }
 }
 
-function updateOutlookStatusUI() {
+async function updateOutlookStatusUI() {
   const textEl = document.getElementById('outlook-status-text');
   const btnEl  = document.getElementById('outlook-connect-btn');
   if (!textEl || !btnEl) return;
-  const inst = msalReady() ? getMsalInstance() : null;
+  const inst = msalReady() ? await ensureMsalInitialized() : null;
   const account = msalAccount || inst?.getActiveAccount() || inst?.getAllAccounts()[0];
   if (account) {
     msalAccount = account;
@@ -1023,7 +1036,7 @@ async function sendMailViaGraph({ to, cc, subject, bodyText, attachment }) {
 // ── E-Mail-Compose-Modal ──
 let pendingEmailAttachment = null;
 
-function openEmailModal({ to = '', cc = '', subject = '', body = '', attachment = null } = {}) {
+async function openEmailModal({ to = '', cc = '', subject = '', body = '', attachment = null } = {}) {
   document.getElementById('email-to').value = to;
   document.getElementById('email-cc').value = cc;
   document.getElementById('email-subject').value = subject;
@@ -1036,7 +1049,7 @@ function openEmailModal({ to = '', cc = '', subject = '', body = '', attachment 
   } else {
     infoEl.style.display = 'none';
   }
-  const inst = msalReady() ? getMsalInstance() : null;
+  const inst = msalReady() ? await ensureMsalInitialized() : null;
   const connected = !!(msalAccount || inst?.getActiveAccount() || inst?.getAllAccounts()[0]);
   document.getElementById('email-not-connected').style.display = connected ? 'none' : 'block';
   openModal('modal-email');
