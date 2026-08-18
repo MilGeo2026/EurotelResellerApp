@@ -927,8 +927,12 @@ function getMsalInstance() {
 }
 
 async function connectOutlook() {
-  if (!msalReady()) {
+  if (!MSAL_CLIENT_ID) {
     alert('Outlook-Anbindung ist noch nicht eingerichtet.\n\nEs fehlt die Azure-AD Client-ID (MSAL_CLIENT_ID) im Quellcode – siehe Kommentar über dieser Funktion für die Einrichtungsschritte.');
+    return;
+  }
+  if (typeof msal === 'undefined') {
+    alert('Die Microsoft-Anmeldebibliothek (MSAL) konnte nicht geladen werden.\n\nDie Client-ID ist korrekt hinterlegt – vermutlich blockiert eine Firewall/ein Netzwerkfilter das Laden von https://alcdn.msauth.net. Bitte im Browser mit F12 → „Netzwerk" prüfen, ob diese Datei rot/fehlgeschlagen angezeigt wird, und ggf. eure IT bitten, die Domain alcdn.msauth.net freizugeben.');
     return;
   }
   const inst = getMsalInstance();
