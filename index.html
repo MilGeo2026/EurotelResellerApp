@@ -571,22 +571,28 @@
         <div class="card">
           <div class="card-header">
             <span class="card-title">Ticketliste</span>
-            <div class="search-wrap">
-              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
-              <input type="text" placeholder="Suchen …" oninput="renderTickets(this.value)" style="width:220px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <button id="tickets-bulk-delete-btn" class="btn btn-danger btn-sm" style="display:none" onclick="deleteSelectedTickets()">
+                🗑 Ausgewählte löschen (<span id="tickets-bulk-count">0</span>)
+              </button>
+              <div class="search-wrap">
+                <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+                <input type="text" placeholder="Suchen …" oninput="renderTickets(this.value)" style="width:220px">
+              </div>
             </div>
           </div>
           <div class="table-wrap">
             <table class="table-fixed">
               <thead>
                 <tr>
-                  <th style="width:10%">Ticket-Nr.</th>
-                  <th style="width:20%">Titel</th>
-                  <th style="width:14%">Kunde</th>
-                  <th style="width:11%">Kategorie</th>
-                  <th style="width:10%">Priorität</th>
-                  <th style="width:13%">Status</th>
-                  <th style="width:9%">Erstellt</th>
+                  <th style="width:4%"><input type="checkbox" id="tickets-select-all-cb" onchange="toggleTicketSelectAll(this)" style="width:16px;flex:none;padding:0;border:none;background:none"></th>
+                  <th style="width:9%">Ticket-Nr.</th>
+                  <th style="width:19%">Titel</th>
+                  <th style="width:13%">Kunde</th>
+                  <th style="width:10%">Kategorie</th>
+                  <th style="width:9%">Priorität</th>
+                  <th style="width:12%">Status</th>
+                  <th style="width:8%">Erstellt</th>
                   <th style="width:13%">Aktionen</th>
                 </tr>
               </thead>
@@ -1966,6 +1972,7 @@ async function deleteTicket(id) {
   const { error } = await sb.from('tickets').delete().eq('id', id);
   if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
   tickets = tickets.filter(t => t.id !== id);
+  selectedTicketIds.delete(id);
   refreshAll();
 }
 
@@ -2139,9 +2146,10 @@ function renderTickets(filter = '') {
     });
   }
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/></svg>
       <p>Noch keine Tickets angelegt.</p></div></td></tr>`;
+    updateTicketBulkActions();
     return;
   }
   tbody.innerHTML = list.map(t => {
@@ -2150,6 +2158,7 @@ function renderTickets(filter = '') {
     const statusOptions = Object.entries(TICKET_STATUS_LABELS).map(([val,label]) =>
       `<option value="${val}" ${t.status===val?'selected':''}>${label}</option>`).join('');
     return `<tr>
+      <td><input type="checkbox" class="ticket-select-cb" data-id="${t.id}" ${selectedTicketIds.has(t.id)?'checked':''} onchange="toggleTicketSelect(this, '${t.id}')" style="width:16px;flex:none;padding:0;border:none;background:none"></td>
       <td>${t.ticketnr ? esc(t.ticketnr) : '<span style="color:var(--gray)">–</span>'}</td>
       <td><strong>${esc(t.titel)}</strong>${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
       <td>${k ? esc(k.firma) : '<span style="color:var(--gray)">–</span>'}</td>
@@ -2163,6 +2172,47 @@ function renderTickets(filter = '') {
       </div></td>
     </tr>`;
   }).join('');
+  updateTicketBulkActions();
+}
+
+// ── Mehrfachauswahl zum Löschen ──
+let selectedTicketIds = new Set();
+
+function toggleTicketSelect(cb, id) {
+  if (cb.checked) selectedTicketIds.add(id); else selectedTicketIds.delete(id);
+  updateTicketBulkActions();
+}
+
+function toggleTicketSelectAll(cb) {
+  document.querySelectorAll('.ticket-select-cb').forEach(row => {
+    row.checked = cb.checked;
+    if (cb.checked) selectedTicketIds.add(row.dataset.id); else selectedTicketIds.delete(row.dataset.id);
+  });
+  updateTicketBulkActions();
+}
+
+function updateTicketBulkActions() {
+  const btn = document.getElementById('tickets-bulk-delete-btn');
+  const countEl = document.getElementById('tickets-bulk-count');
+  const selectAllCb = document.getElementById('tickets-select-all-cb');
+  if (!btn) return;
+  btn.style.display = selectedTicketIds.size ? '' : 'none';
+  if (countEl) countEl.textContent = selectedTicketIds.size;
+  if (selectAllCb) {
+    const visible = Array.from(document.querySelectorAll('.ticket-select-cb'));
+    selectAllCb.checked = visible.length > 0 && visible.every(row => selectedTicketIds.has(row.dataset.id));
+  }
+}
+
+async function deleteSelectedTickets() {
+  const ids = Array.from(selectedTicketIds);
+  if (!ids.length) return;
+  if (!confirm(`${ids.length} Ticket(s) wirklich löschen?`)) return;
+  const { error } = await sb.from('tickets').delete().in('id', ids);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  tickets = tickets.filter(t => !selectedTicketIds.has(t.id));
+  selectedTicketIds.clear();
+  refreshAll();
 }
 
 // ══════════════════════════════════════════════════
