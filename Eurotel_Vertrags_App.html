@@ -812,6 +812,11 @@
         <div class="form-group full"><label>Beschreibung</label><textarea id="t-beschreibung" placeholder="Details zum Anliegen …"></textarea></div>
       </div>
 
+      <div id="t-anhaenge-section" style="display:none">
+        <div class="section-label" style="margin-top:14px">Anhänge (aus E-Mail)</div>
+        <div id="t-anhaenge-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
       <div id="t-verlauf-section" style="display:none">
         <div class="section-label" style="margin-top:14px">Verlauf</div>
         <div id="t-verlauf-list" style="border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;margin-bottom:8px"></div>
@@ -1797,6 +1802,7 @@ function openTicketModal(id = null, prefill = null) {
   document.getElementById('t-beschreibung').value = '';
   document.getElementById('t-verlauf-eintrag').value = '';
   document.getElementById('t-verlauf-section').style.display = 'none';
+  document.getElementById('t-anhaenge-section').style.display = 'none';
 
   if (id) {
     const t = tickets.find(x => x.id === id);
@@ -1810,6 +1816,14 @@ function openTicketModal(id = null, prefill = null) {
       document.getElementById('t-beschreibung').value = t.beschreibung || '';
       document.getElementById('t-verlauf-section').style.display = '';
       renderTicketVerlauf(t);
+      if ((t.anhaenge||[]).length) {
+        document.getElementById('t-anhaenge-section').style.display = '';
+        document.getElementById('t-anhaenge-list').innerHTML = t.anhaenge.map(a => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12.5px">
+            <span>📎 ${esc(a.name)}</span>
+            <button class="btn btn-secondary btn-sm" onclick="ladeEmailAnhang('${esc(a.pfad)}')">Herunterladen</button>
+          </div>`).join('');
+      }
     }
     document.getElementById('modal-ticket-title').textContent = 'Ticket bearbeiten';
   } else {
@@ -1887,6 +1901,47 @@ async function updateTicketStatus(id, status) {
 // ══════════════════════════════════════════════════
 //  WEBFLEET-E-MAILS → TICKETS (über Outlook / Microsoft Graph)
 // ══════════════════════════════════════════════════
+// ── Anhänge aus importierten E-Mails (Ticket / Kündigung / Vertragsaktivierung) ──
+// Setup: In Supabase einmalig einen Storage-Bucket "email-anhaenge" anlegen (nicht öffentlich)
+// mit Policies für "authenticated" auf select/insert, analog zu "vertraege-dokumente".
+const EMAIL_ANHAENGE_BUCKET = 'email-anhaenge';
+
+function base64ToBlob(base64, contentType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: contentType || 'application/octet-stream' });
+}
+
+async function fetchAndUploadMailAttachments(mailId, ordner) {
+  try {
+    const token = await getGraphAccessToken();
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${mailId}/attachments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const dateien = (json.value || []).filter(a => a['@odata.type'] === '#microsoft.graph.fileAttachment' && a.contentBytes);
+    const hochgeladen = [];
+    for (const a of dateien) {
+      const blob = base64ToBlob(a.contentBytes, a.contentType);
+      const pfad = `${ordner}/${a.name}`;
+      const { error } = await sb.storage.from(EMAIL_ANHAENGE_BUCKET).upload(pfad, blob, { contentType: a.contentType, upsert: true });
+      if (!error) hochgeladen.push({ name: a.name, pfad });
+    }
+    return hochgeladen;
+  } catch (e) {
+    console.warn('Anhänge konnten nicht geladen werden:', e.message);
+    return [];
+  }
+}
+
+async function ladeEmailAnhang(pfad) {
+  const { data, error } = await sb.storage.from(EMAIL_ANHAENGE_BUCKET).createSignedUrl(pfad, 60);
+  if (error) { alert('Fehler beim Laden des Anhangs: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
 const WEBFLEET_SENDER_DOMAINS = ['webfleet.com', 'bridgestone-mobility.com'];
 let webfleetMailCandidates = [];
 let ignoredWebfleetMailIds = new Set();
@@ -2001,6 +2056,7 @@ async function createTicketsFromSelectedWebfleetMails() {
     const senderEmail = m.from?.emailAddress?.address || '';
     const support = parseWebfleetSupportMail(m);
     const kundeTreffer = matchKundeInText(m.subject);
+    const anhaenge = await fetchAndUploadMailAttachments(m.id, `tickets/${uid()}`);
     const data = {
       titel: (support ? support.titel : m.subject) || 'Webfleet-E-Mail ohne Betreff',
       ticketnr: support ? support.ticketnr : '',
@@ -2010,7 +2066,8 @@ async function createTicketsFromSelectedWebfleetMails() {
       status: 'offen',
       beschreibung: (m.bodyPreview || '').trim() + `\n\n(Automatisch aus Webfleet-E-Mail importiert, Absender: ${senderEmail}, Eingang: ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : '–'})`,
       webfleetMailId: m.id,
-      verlauf: [verlaufEintrag('Ticket automatisch aus Webfleet-E-Mail erstellt')],
+      anhaenge,
+      verlauf: [verlaufEintrag('Ticket automatisch aus Webfleet-E-Mail erstellt' + (anhaenge.length ? ` (${anhaenge.length} Anhang/Anhänge gespeichert)` : ''))],
     };
     const { data: inserted, error } = await sb.from('tickets').insert({ data }).select().single();
     if (error) { alert(`Fehler beim Anlegen von "${data.titel}": ` + error.message); continue; }
@@ -2130,12 +2187,14 @@ async function createVertragsereignisseFromSelection(type) {
   for (const cb of checked) {
     const m = vertragsereignisCandidates[type][+cb.dataset.idx];
     if (!m) continue;
+    const anhaenge = await fetchAndUploadMailAttachments(m.id, `${cfg.table}/${uid()}`);
     const data = {
       betreff:      m.subject || '',
       kundennummer: extractKundennummer(m.subject),
       absender:     m.from?.emailAddress?.address || '',
       eingegangen:  m.receivedDateTime || null,
       mailId:       m.id,
+      anhaenge,
     };
     const { data: inserted, error } = await sb.from(cfg.table).insert({ data }).select().single();
     if (error) { alert('Fehler beim Anlegen: ' + error.message); continue; }
@@ -2160,7 +2219,10 @@ function renderVertragsereignisTabelle(type) {
     <td><strong>${esc(e.kundennummer || '–')}</strong></td>
     <td>${esc(e.betreff || '–')}</td>
     <td>${e.eingegangen ? new Date(e.eingegangen).toLocaleString('de-DE') : '–'}</td>
-    <td><div class="td-actions"><button class="btn btn-danger btn-sm" onclick="deleteVertragsereignis('${type}','${e.id}')">🗑</button></div></td>
+    <td><div class="td-actions">
+      ${(e.anhaenge||[]).map(a => `<button class="btn btn-secondary btn-sm" title="${esc(a.name)}" onclick="ladeEmailAnhang('${esc(a.pfad)}')">📎</button>`).join('')}
+      <button class="btn btn-danger btn-sm" onclick="deleteVertragsereignis('${type}','${e.id}')">🗑</button>
+    </div></td>
   </tr>`).join('');
 }
 
@@ -2235,7 +2297,7 @@ function renderTickets(filter = '') {
     return `<tr>
       <td><input type="checkbox" class="ticket-select-cb" data-id="${t.id}" ${selectedTicketIds.has(t.id)?'checked':''} onchange="toggleTicketSelect(this, '${t.id}')" style="width:16px;flex:none;padding:0;border:none;background:none"></td>
       <td>${t.ticketnr ? esc(t.ticketnr) : '<span style="color:var(--gray)">–</span>'}</td>
-      <td><strong>${esc(t.titel)}</strong>${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
+      <td><strong>${esc(t.titel)}</strong>${(t.anhaenge||[]).length?` <span title="${(t.anhaenge||[]).length} Anhang/Anhänge">📎</span>`:''}${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
       <td>${k ? esc(k.firma) : '<span style="color:var(--gray)">–</span>'}</td>
       <td>${esc(t.kategorie||'–')}</td>
       <td><span class="prio prio-${t.prioritaet||'mittel'}">${TICKET_PRIO_LABELS[t.prioritaet]||'Mittel'}</span></td>
