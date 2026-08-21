@@ -787,6 +787,7 @@
           <select id="t-kategorie">
             <option>Hardware</option>
             <option>Software</option>
+            <option>Support Webfleet Tickets</option>
             <option>Abrechnung</option>
             <option>Vertrag</option>
             <option>Sonstiges</option>
@@ -1936,19 +1937,53 @@ async function checkWebfleetMails(manual = true) {
     if (!webfleetMailCandidates.length) { statusEl.textContent = `Alle ${found.length} gefundenen Webfleet-E-Mails sind bereits als Ticket angelegt oder ignoriert.`; return; }
 
     statusEl.textContent = `${webfleetMailCandidates.length} neue Webfleet-E-Mail(s) gefunden – bitte auswählen und Tickets anlegen:`;
-    listEl.innerHTML = webfleetMailCandidates.map((m, i) => `
+    listEl.innerHTML = webfleetMailCandidates.map((m, i) => {
+      const support = parseWebfleetSupportMail(m);
+      const kundeTreffer = matchKundeInText(m.subject);
+      const badges = support
+        ? `<span class="badge" style="margin-right:6px">Support Webfleet Tickets</span>${support.ticketnr ? `<span class="badge" style="margin-right:6px">Ticket-Nr. ${esc(support.ticketnr)}</span>` : ''}${kundeTreffer ? `<span class="badge">Kunde: ${esc(kundeTreffer.firma)}</span>` : ''}`
+        : '';
+      return `
       <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
         <input type="checkbox" class="webfleet-mail-cb" data-idx="${i}" checked style="margin-top:3px;width:16px;flex:none;padding:0;border:none;background:none">
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px">${esc(m.subject || '(kein Betreff)')}</div>
           <div style="font-size:11px;color:var(--gray)">${esc(m.from?.emailAddress?.address || '')} · ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : ''}</div>
+          ${badges ? `<div style="margin-top:5px">${badges}</div>` : ''}
           <div style="font-size:12px;color:var(--gray);margin-top:4px">${esc((m.bodyPreview || '').slice(0, 160))}</div>
         </div>
-      </label>`).join('');
+      </label>`;
+    }).join('');
     actionsEl.style.display = 'block';
   } catch (e) {
     statusEl.textContent = manual ? ('Fehler beim Prüfen: ' + e.message) : 'Nicht geprüft (Outlook-Verbindung nicht bereit).';
   }
+}
+
+// Webfleet-Support-Autoreply erkennen, z.B. Betreff:
+// "AW: NM3320W00283 - aufgeblähter Akku - 05488382"
+// ("Ihre Referenznummer für diesen Vorgang lautet: 05488382" im Text)
+// -> eigene Kategorie + Ticketnummer aus dem Betreff, sauberer Titel ohne Präfix/Referenznummer.
+function parseWebfleetSupportMail(m) {
+  const subject = m.subject || '';
+  const senderEmail = (m.from?.emailAddress?.address || '').toLowerCase();
+  const refMatch = subject.match(/-\s*(\d{4,})\s*$/);
+  const isSupportAutoReply = senderEmail === 'auto-reply@webfleet.com'
+    || /Referenznummer für diesen Vorgang lautet/i.test(m.bodyPreview || '')
+    || !!refMatch;
+  if (!isSupportAutoReply) return null;
+  const ticketnr = refMatch ? refMatch[1] : '';
+  let titel = subject.replace(/^(AW|RE|WG|FW)\s*:\s*/i, '').trim();
+  if (refMatch) titel = titel.slice(0, refMatch.index).replace(/-\s*$/, '').trim();
+  return { ticketnr, titel: titel || subject };
+}
+
+// Kunde anhand Firma/Name im Betreff finden (nur wenn eindeutig ein Treffer).
+function matchKundeInText(text) {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  const treffer = kunden.filter(k => (k.firma && t.includes(k.firma.toLowerCase())) || (k.name && t.includes(k.name.toLowerCase())));
+  return treffer.length === 1 ? treffer[0] : null;
 }
 
 async function createTicketsFromSelectedWebfleetMails() {
@@ -1959,11 +1994,13 @@ async function createTicketsFromSelectedWebfleetMails() {
     const m = webfleetMailCandidates[+cb.dataset.idx];
     if (!m) continue;
     const senderEmail = m.from?.emailAddress?.address || '';
+    const support = parseWebfleetSupportMail(m);
+    const kundeTreffer = matchKundeInText(m.subject);
     const data = {
-      titel: m.subject || 'Webfleet-E-Mail ohne Betreff',
-      ticketnr: '',
-      kundeId: null,
-      kategorie: 'Software',
+      titel: (support ? support.titel : m.subject) || 'Webfleet-E-Mail ohne Betreff',
+      ticketnr: support ? support.ticketnr : '',
+      kundeId: kundeTreffer ? kundeTreffer.id : null,
+      kategorie: support ? 'Support Webfleet Tickets' : 'Software',
       prioritaet: 'mittel',
       status: 'offen',
       beschreibung: (m.bodyPreview || '').trim() + `\n\n(Automatisch aus Webfleet-E-Mail importiert, Absender: ${senderEmail}, Eingang: ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : '–'})`,
