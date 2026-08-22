@@ -272,6 +272,17 @@
     .modal-header, .modal-footer { padding: 14px 16px; }
     .btn { padding: 9px 14px; }
     th, td { padding: 8px 10px; font-size: 12.5px; }
+
+    /* Datentabellen als Karten statt gequetschter Zeilen */
+    table.table-fixed thead { display: none; }
+    table.table-fixed, table.table-fixed tbody, table.table-fixed tr, table.table-fixed td { display: block; width: 100%; }
+    table.table-fixed tr { background: var(--white); border: 1px solid var(--border); border-radius: 10px;
+                            margin-bottom: 10px; padding: 6px 12px; }
+    table.table-fixed td { border: none; padding: 7px 0; text-align: right; }
+    table.table-fixed td::before { content: attr(data-label); float: left; font-weight: 600;
+                                    color: var(--gray); font-size: 11px; text-transform: uppercase;
+                                    letter-spacing: .02em; padding-right: 10px; }
+    table.table-fixed .td-actions { justify-content: flex-end; }
   }
 </style>
 </head>
@@ -1411,13 +1422,13 @@ function renderKunden(filter = '') {
   tbody.innerHTML = list.map(k => {
     const vCount = vertraege.filter(v => v.kundeId === k.id).length;
     return `<tr>
-      <td><strong>${esc(k.firma)}</strong>${k.branche ? `<br><span style="color:var(--gray);font-size:11px">${esc(k.branche)}</span>` : ''}</td>
-      <td>${esc(k.name)}${k.position ? `<br><span style="color:var(--gray);font-size:11px">${esc(k.position)}</span>` : ''}</td>
-      <td><a href="mailto:${esc(k.email)}" style="color:var(--blue-mid)">${esc(k.email)}</a></td>
-      <td>${esc(k.tel||'–')}</td>
-      <td>${esc(k.plz ? k.plz+' '+k.ort : k.ort||'–')}${k.land && k.land!=='Deutschland' ? `<br><span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 5px">${esc(k.land)}</span>` : ''}</td>
-      <td><span class="badge">${vCount}</span></td>
-      <td><div class="td-actions">
+      <td data-label="Unternehmen"><strong>${esc(k.firma)}</strong>${k.branche ? `<br><span style="color:var(--gray);font-size:11px">${esc(k.branche)}</span>` : ''}</td>
+      <td data-label="Ansprechpartner">${esc(k.name)}${k.position ? `<br><span style="color:var(--gray);font-size:11px">${esc(k.position)}</span>` : ''}</td>
+      <td data-label="E-Mail"><a href="mailto:${esc(k.email)}" style="color:var(--blue-mid)">${esc(k.email)}</a></td>
+      <td data-label="Telefon">${esc(k.tel||'–')}</td>
+      <td data-label="Ort">${esc(k.plz ? k.plz+' '+k.ort : k.ort||'–')}${k.land && k.land!=='Deutschland' ? `<br><span style="font-size:11px;background:#FEF3C7;color:#92400E;border-radius:4px;padding:1px 5px">${esc(k.land)}</span>` : ''}</td>
+      <td data-label="Verträge"><span class="badge">${vCount}</span></td>
+      <td data-label="Aktionen"><div class="td-actions">
         <button class="btn btn-secondary btn-sm" title="E-Mail senden" onclick="sendKundeMail('${k.id}')">✉</button>
         <button class="btn btn-secondary btn-sm" onclick="openKundeModal('${k.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteKunde('${k.id}')">🗑</button>
@@ -1643,14 +1654,14 @@ function renderVertraege(filter = '') {
     const stLabel = {aktiv:'Aktiv', entwurf:'Entwurf', abgelaufen:'Abgelaufen'}[v.status]||v.status;
     const fmt = n => '€ ' + (n||0).toLocaleString('de-DE', {minimumFractionDigits:0});
     return `<tr>
-      <td><strong>${esc(v.nr)}</strong></td>
-      <td>${esc(firmaName)}</td>
-      <td style="font-size:12px">${pLabels.slice(0,3).map(l=>`<span style="background:var(--blue-light);color:var(--blue-mid);border-radius:4px;padding:1px 6px;margin:1px;display:inline-block">${esc(l)}</span>`).join('')}${pLabels.length>3?`<span style="color:var(--gray);font-size:11px"> +${pLabels.length-3}</span>`:''}</td>
-      <td>${fmtDate(v.beginn)}</td>
-      <td>${fmtDate(v.ende)}</td>
-      <td><span class="status ${stClass}"><span class="status-dot"></span>${stLabel}</span></td>
-      <td><strong>${fmt(v.gesamtJahr)}</strong></td>
-      <td><div class="td-actions">
+      <td data-label="Vertrag-Nr."><strong>${esc(v.nr)}</strong></td>
+      <td data-label="Kunde">${esc(firmaName)}</td>
+      <td data-label="Produkte" style="font-size:12px">${pLabels.slice(0,3).map(l=>`<span style="background:var(--blue-light);color:var(--blue-mid);border-radius:4px;padding:1px 6px;margin:1px;display:inline-block">${esc(l)}</span>`).join('')}${pLabels.length>3?`<span style="color:var(--gray);font-size:11px"> +${pLabels.length-3}</span>`:''}</td>
+      <td data-label="Beginn">${fmtDate(v.beginn)}</td>
+      <td data-label="Ende">${fmtDate(v.ende)}</td>
+      <td data-label="Status"><span class="status ${stClass}"><span class="status-dot"></span>${stLabel}</span></td>
+      <td data-label="Wert/Jahr"><strong>${fmt(v.gesamtJahr)}</strong></td>
+      <td data-label="Aktionen"><div class="td-actions">
         <button class="btn btn-secondary btn-sm" title="Details & PDF" onclick="showDetail('${v.id}')">📄</button>
         <button class="btn btn-secondary btn-sm" onclick="openVertragModal('${v.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteVertrag('${v.id}')">🗑</button>
@@ -1702,11 +1713,11 @@ function renderUmfrageAntworten(filter = '') {
       ? `<strong>${esc(a.kontakt_firma||'–')}</strong>${a.kontakt_name?`<br><span style="font-size:11px;color:var(--gray)">${esc(a.kontakt_name)}</span>`:''}`
       : `<span style="color:var(--gray)">anonym</span>`;
     return `<tr>
-      <td>${datum}</td>
-      <td>${a.gesamtzufriedenheit!=null ? a.gesamtzufriedenheit+' / 5' : '–'}</td>
-      <td>${a.nps!=null ? a.nps+' / 10' : '–'}</td>
-      <td>${kontakt}</td>
-      <td><div class="td-actions">
+      <td data-label="Datum">${datum}</td>
+      <td data-label="Zufriedenheit">${a.gesamtzufriedenheit!=null ? a.gesamtzufriedenheit+' / 5' : '–'}</td>
+      <td data-label="Weiterempfehlung">${a.nps!=null ? a.nps+' / 10' : '–'}</td>
+      <td data-label="Kontakt">${kontakt}</td>
+      <td data-label="Aktionen"><div class="td-actions">
         <button class="btn btn-secondary btn-sm" title="Details" onclick="showUmfrageDetail('${a.id}')">👁</button>
         <button class="btn btn-danger btn-sm" onclick="deleteUmfrageAntwort('${a.id}')">🗑</button>
       </div></td>
@@ -2216,10 +2227,10 @@ function renderVertragsereignisTabelle(type) {
     return;
   }
   tbody.innerHTML = list.map(e => `<tr>
-    <td><strong>${esc(e.kundennummer || '–')}</strong></td>
-    <td>${esc(e.betreff || '–')}</td>
-    <td>${e.eingegangen ? new Date(e.eingegangen).toLocaleString('de-DE') : '–'}</td>
-    <td><div class="td-actions">
+    <td data-label="Kundennummer"><strong>${esc(e.kundennummer || '–')}</strong></td>
+    <td data-label="Betreff">${esc(e.betreff || '–')}</td>
+    <td data-label="Eingegangen">${e.eingegangen ? new Date(e.eingegangen).toLocaleString('de-DE') : '–'}</td>
+    <td data-label="Aktionen"><div class="td-actions">
       ${(e.anhaenge||[]).map(a => `<button class="btn btn-secondary btn-sm" title="${esc(a.name)}" onclick="ladeEmailAnhang('${esc(a.pfad)}')">📎</button>`).join('')}
       <button class="btn btn-danger btn-sm" onclick="deleteVertragsereignis('${type}','${e.id}')">🗑</button>
     </div></td>
@@ -2295,15 +2306,15 @@ function renderTickets(filter = '') {
     const statusOptions = Object.entries(TICKET_STATUS_LABELS).map(([val,label]) =>
       `<option value="${val}" ${t.status===val?'selected':''}>${label}</option>`).join('');
     return `<tr>
-      <td><input type="checkbox" class="ticket-select-cb" data-id="${t.id}" ${selectedTicketIds.has(t.id)?'checked':''} onchange="toggleTicketSelect(this, '${t.id}')" style="width:16px;flex:none;padding:0;border:none;background:none"></td>
-      <td>${t.ticketnr ? esc(t.ticketnr) : '<span style="color:var(--gray)">–</span>'}</td>
-      <td><strong>${esc(t.titel)}</strong>${(t.anhaenge||[]).length?` <span title="${(t.anhaenge||[]).length} Anhang/Anhänge">📎</span>`:''}${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
-      <td>${k ? esc(k.firma) : '<span style="color:var(--gray)">–</span>'}</td>
-      <td>${esc(t.kategorie||'–')}</td>
-      <td><span class="prio prio-${t.prioritaet||'mittel'}">${TICKET_PRIO_LABELS[t.prioritaet]||'Mittel'}</span></td>
-      <td><select class="status-select status-${t.status||'offen'}" onchange="updateTicketStatus('${t.id}', this.value)">${statusOptions}</select></td>
-      <td>${datum}</td>
-      <td><div class="td-actions">
+      <td data-label="Auswahl"><input type="checkbox" class="ticket-select-cb" data-id="${t.id}" ${selectedTicketIds.has(t.id)?'checked':''} onchange="toggleTicketSelect(this, '${t.id}')" style="width:16px;flex:none;padding:0;border:none;background:none"></td>
+      <td data-label="Ticket-Nr.">${t.ticketnr ? esc(t.ticketnr) : '<span style="color:var(--gray)">–</span>'}</td>
+      <td data-label="Titel"><strong>${esc(t.titel)}</strong>${(t.anhaenge||[]).length?` <span title="${(t.anhaenge||[]).length} Anhang/Anhänge">📎</span>`:''}${t.beschreibung?`<br><span style="font-size:11px;color:var(--gray)">${esc(t.beschreibung.slice(0,60))}${t.beschreibung.length>60?'…':''}</span>`:''}</td>
+      <td data-label="Kunde">${k ? esc(k.firma) : '<span style="color:var(--gray)">–</span>'}</td>
+      <td data-label="Kategorie">${esc(t.kategorie||'–')}</td>
+      <td data-label="Priorität"><span class="prio prio-${t.prioritaet||'mittel'}">${TICKET_PRIO_LABELS[t.prioritaet]||'Mittel'}</span></td>
+      <td data-label="Status"><select class="status-select status-${t.status||'offen'}" onchange="updateTicketStatus('${t.id}', this.value)">${statusOptions}</select></td>
+      <td data-label="Erstellt">${datum}</td>
+      <td data-label="Aktionen"><div class="td-actions">
         <button class="btn btn-secondary btn-sm" onclick="openTicketModal('${t.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteTicket('${t.id}')">🗑</button>
       </div></td>
