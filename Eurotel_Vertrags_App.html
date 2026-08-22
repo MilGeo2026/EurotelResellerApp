@@ -253,7 +253,7 @@
     .main { margin-left: 0; }
     .topbar { padding: 0 14px; }
     .topbar-title { font-size: 15px; }
-    .badge { display: none; }
+    #topbarBadge { display: none; }
     .content { padding: 16px 12px; }
     .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
     .stat-card { padding: 12px 14px; gap: 10px; }
@@ -278,11 +278,11 @@
     table.table-fixed, table.table-fixed tbody, table.table-fixed tr, table.table-fixed td { display: block; width: 100%; }
     table.table-fixed tr { background: var(--white); border: 1px solid var(--border); border-radius: 10px;
                             margin-bottom: 10px; padding: 6px 12px; }
-    table.table-fixed td { border: none; padding: 7px 0; text-align: right; }
-    table.table-fixed td::before { content: attr(data-label); float: left; font-weight: 600;
-                                    color: var(--gray); font-size: 11px; text-transform: uppercase;
-                                    letter-spacing: .02em; padding-right: 10px; }
-    table.table-fixed .td-actions { justify-content: flex-end; }
+    table.table-fixed td { display: block; border: none; padding: 7px 0; text-align: left; }
+    table.table-fixed td::before { content: attr(data-label); display: block; font-weight: 600;
+                                    color: var(--gray); font-size: 10.5px; text-transform: uppercase;
+                                    letter-spacing: .02em; margin-bottom: 2px; }
+    table.table-fixed .td-actions { justify-content: flex-start; margin-top: 2px; }
   }
 </style>
 </head>
