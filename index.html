@@ -1988,8 +1988,8 @@ async function extractPdfPageTexts(bytes) {
   return seiten;
 }
 
-function parseWebfleetProdukteAusPdfText(seitenText) {
-  const volltext = seitenText.join('\n');
+// Tabelle "Kauf von zusätzlichen Diensten" (Zusatzdienste wie Direct FMS etc.)
+function parseZusatzdiensteAusPdfText(volltext) {
   if (!/Kauf von zus[aä]tzlichen Diensten/i.test(volltext)) return [];
   const zeilenRegex = /(\d+)\s+(.+?)\s+(\S+)\s+(NAT|EU|INT)\s+(\d{2}\.\d{2}\.\d{2})\s+(Monatlich|Einmalig|J[aä]hrlich)\s+([\d.,]+)\s*€\s+([\d.,]+)\s*€/g;
   const produkte = [];
@@ -2005,6 +2005,33 @@ function parseWebfleetProdukteAusPdfText(seitenText) {
     });
   }
   return produkte;
+}
+
+// Tabelle "WEBFLEET-Tarif" (Grundtarif je Vertragsobjekt, z.B. "Tarifdetails WF-DE-EU-LIVE 12 24,50 € 24 294,00 €"
+// gefolgt von "Geräte LINK 740 (+ PRO 8475 TRUCK)")
+function parseWebfleetTarifAusPdfText(volltext) {
+  if (!/WEBFLEET-Tarif/i.test(volltext)) return [];
+  const produkte = [];
+  const tarifRegex = /Tarifdetails\s+(\S+)\s+(\d+)\s+([\d.,]+)\s*€\s+(\d+)\s+([\d.,]+)\s*€/g;
+  let match;
+  while ((match = tarifRegex.exec(volltext)) !== null) {
+    const rest = volltext.slice(match.index + match[0].length);
+    const geraeteMatch = rest.match(/^\s*Ger[aä]te\s+(.+?)(?=\s+(?:Gesamtpreis exklusive|Vertragsobjekt|Tarifdetails|$))/);
+    produkte.push({
+      dienst: `WEBFLEET-Tarif ${match[1]}` + (geraeteMatch ? ` (${geraeteMatch[1].trim()})` : ''),
+      zugangObjekt: `${match[2]} Fahrzeug(e)`,
+      typ: 'Monatlich',
+      preisProArtikel: match[3],
+      minVertragsdauer: match[4],
+      gesamtpreis: match[5],
+    });
+  }
+  return produkte;
+}
+
+function parseWebfleetProdukteAusPdfText(seitenText) {
+  const volltext = seitenText.join('\n');
+  return [...parseZusatzdiensteAusPdfText(volltext), ...parseWebfleetTarifAusPdfText(volltext)];
 }
 
 async function extractProduktePdfFromMail(mailId) {
@@ -2318,7 +2345,10 @@ function renderVertragsereignisTabelle(type) {
 
 function produkteZusammenfassung(e) {
   if ((e.produkte||[]).length) {
-    return e.produkte.map(p => `${esc(p.dienst)} <span style="color:var(--gray);font-size:11px">(${esc(p.preisProArtikel)} €${p.typ ? '/' + esc(p.typ) : ''})</span>`).join('<br>');
+    return e.produkte.map(p => {
+      const preis = p.gesamtpreis || p.preisProArtikel;
+      return `${esc(p.dienst)}${preis ? ` <span style="color:var(--gray);font-size:11px">(${esc(preis)} €${p.typ ? '/' + esc(p.typ) : ''})</span>` : ''}`;
+    }).join('<br>');
   }
   if (e.produktePdfRohtext) return '<span style="color:var(--orange);font-size:12px">PDF gefunden, Format nicht erkannt</span>';
   return '<span style="color:var(--gray)">–</span>';
