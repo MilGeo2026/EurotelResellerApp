@@ -630,9 +630,10 @@
             <table class="table-fixed">
               <thead>
                 <tr>
-                  <th style="width:16%">Kundennummer</th>
-                  <th style="width:50%">Betreff</th>
-                  <th style="width:20%">Eingegangen</th>
+                  <th style="width:13%">Kundennummer</th>
+                  <th style="width:33%">Betreff</th>
+                  <th style="width:24%">Produkte</th>
+                  <th style="width:16%">Eingegangen</th>
                   <th style="width:14%">Aktionen</th>
                 </tr>
               </thead>
@@ -655,9 +656,10 @@
             <table class="table-fixed">
               <thead>
                 <tr>
-                  <th style="width:16%">Kundennummer</th>
-                  <th style="width:50%">Betreff</th>
-                  <th style="width:20%">Eingegangen</th>
+                  <th style="width:13%">Kundennummer</th>
+                  <th style="width:33%">Betreff</th>
+                  <th style="width:24%">Produkte</th>
+                  <th style="width:16%">Eingegangen</th>
                   <th style="width:14%">Aktionen</th>
                 </tr>
               </thead>
@@ -1953,6 +1955,79 @@ async function ladeEmailAnhang(pfad) {
   window.open(data.signedUrl, '_blank');
 }
 
+// ── Produkte aus der "Willkommen"-PDF auslesen (Vertragsereignisse) ──
+// Die PDF ("willkommen…") listet auf Seite 2 unter "Kauf von zusätzlichen Diensten"
+// eine Tabelle: # | Zusätzlicher Dienst | Zugang/Objekt | NAT/EU/INT | Gültig ab | Typ | Preis/Artikel | Gesamtpreis
+let pdfjsLibPromise = null;
+function ladePdfJs() {
+  if (!pdfjsLibPromise) {
+    pdfjsLibPromise = import('./vendor/pdf.min.mjs').then(mod => {
+      mod.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.mjs';
+      return mod;
+    });
+  }
+  return pdfjsLibPromise;
+}
+
+function base64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function extractPdfPageTexts(bytes) {
+  const pdfjsLib = await ladePdfJs();
+  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const seiten = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    seiten.push(content.items.map(it => it.str).join(' '));
+  }
+  return seiten;
+}
+
+function parseWebfleetProdukteAusPdfText(seitenText) {
+  const volltext = seitenText.join('\n');
+  if (!/Kauf von zus[aä]tzlichen Diensten/i.test(volltext)) return [];
+  const zeilenRegex = /(\d+)\s+(.+?)\s+(\S+)\s+(NAT|EU|INT)\s+(\d{2}\.\d{2}\.\d{2})\s+(Monatlich|Einmalig|J[aä]hrlich)\s+([\d.,]+)\s*€\s+([\d.,]+)\s*€/g;
+  const produkte = [];
+  let match;
+  while ((match = zeilenRegex.exec(volltext)) !== null) {
+    produkte.push({
+      dienst: match[2].trim(),
+      zugangObjekt: match[3].trim(),
+      gueltigAb: match[5],
+      typ: match[6],
+      preisProArtikel: match[7],
+      gesamtpreis: match[8],
+    });
+  }
+  return produkte;
+}
+
+async function extractProduktePdfFromMail(mailId) {
+  try {
+    const token = await getGraphAccessToken();
+    const res = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${mailId}/attachments`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { produkte: [], produktePdfRohtext: '' };
+    const json = await res.json();
+    const pdf = (json.value || []).find(a =>
+      a['@odata.type'] === '#microsoft.graph.fileAttachment' && a.contentBytes && /^willkommen/i.test(a.name || ''));
+    if (!pdf) return { produkte: [], produktePdfRohtext: '' };
+    const bytes = base64ToUint8Array(pdf.contentBytes);
+    const seitenText = await extractPdfPageTexts(bytes);
+    const produkte = parseWebfleetProdukteAusPdfText(seitenText);
+    return { produkte, produktePdfRohtext: produkte.length ? '' : seitenText.join('\n\n---\n\n').slice(0, 4000) };
+  } catch (e) {
+    console.warn('PDF-Auswertung fehlgeschlagen:', e.message);
+    return { produkte: [], produktePdfRohtext: '' };
+  }
+}
+
 const WEBFLEET_SENDER_DOMAINS = ['webfleet.com', 'bridgestone-mobility.com'];
 let webfleetMailCandidates = [];
 let ignoredWebfleetMailIds = new Set();
@@ -2199,6 +2274,7 @@ async function createVertragsereignisseFromSelection(type) {
     const m = vertragsereignisCandidates[type][+cb.dataset.idx];
     if (!m) continue;
     const anhaenge = await fetchAndUploadMailAttachments(m.id, `${cfg.table}/${uid()}`);
+    const { produkte, produktePdfRohtext } = await extractProduktePdfFromMail(m.id);
     const data = {
       betreff:      m.subject || '',
       kundennummer: extractKundennummer(m.subject),
@@ -2206,6 +2282,8 @@ async function createVertragsereignisseFromSelection(type) {
       eingegangen:  m.receivedDateTime || null,
       mailId:       m.id,
       anhaenge,
+      produkte,
+      produktePdfRohtext,
     };
     const { data: inserted, error } = await sb.from(cfg.table).insert({ data }).select().single();
     if (error) { alert('Fehler beim Anlegen: ' + error.message); continue; }
@@ -2223,18 +2301,27 @@ function renderVertragsereignisTabelle(type) {
   if (!tbody) return;
   const list = vertragsereignisListen[type] || [];
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty" style="padding:20px;text-align:center;color:var(--gray)">Noch keine Einträge</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty" style="padding:20px;text-align:center;color:var(--gray)">Noch keine Einträge</div></td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(e => `<tr>
     <td data-label="Kundennummer"><strong>${esc(e.kundennummer || '–')}</strong></td>
     <td data-label="Betreff">${esc(e.betreff || '–')}</td>
+    <td data-label="Produkte">${produkteZusammenfassung(e)}</td>
     <td data-label="Eingegangen">${e.eingegangen ? new Date(e.eingegangen).toLocaleString('de-DE') : '–'}</td>
     <td data-label="Aktionen"><div class="td-actions">
       ${(e.anhaenge||[]).map(a => `<button class="btn btn-secondary btn-sm" title="${esc(a.name)}" onclick="ladeEmailAnhang('${esc(a.pfad)}')">📎</button>`).join('')}
       <button class="btn btn-danger btn-sm" onclick="deleteVertragsereignis('${type}','${e.id}')">🗑</button>
     </div></td>
   </tr>`).join('');
+}
+
+function produkteZusammenfassung(e) {
+  if ((e.produkte||[]).length) {
+    return e.produkte.map(p => `${esc(p.dienst)} <span style="color:var(--gray);font-size:11px">(${esc(p.preisProArtikel)} €${p.typ ? '/' + esc(p.typ) : ''})</span>`).join('<br>');
+  }
+  if (e.produktePdfRohtext) return '<span style="color:var(--orange);font-size:12px">PDF gefunden, Format nicht erkannt</span>';
+  return '<span style="color:var(--gray)">–</span>';
 }
 
 async function deleteVertragsereignis(type, id) {
