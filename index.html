@@ -616,6 +616,52 @@
 
       <!-- ══ VERTRAGSEREIGNISSE (Kündigungen & Aktivierungen aus E-Mail) ══ -->
       <div class="page" id="page-vertragsereignisse">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#F0FDF4">
+              <svg fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Aktivierte Produkte</div>
+              <div class="stat-value" id="pu-stat-aktiviert">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FEE2E2">
+              <svg fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Gekündigte Produkte</div>
+              <div class="stat-value" id="pu-stat-gekuendigt">0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#F0FDF4">
+              <svg fill="none" stroke="#16A34A" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Neuer mtl. Umsatz</div>
+              <div class="stat-value" id="pu-stat-umsatz-neu">€ 0</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background:#FEE2E2">
+              <svg fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            </div>
+            <div>
+              <div class="stat-label">Verlorener mtl. Umsatz</div>
+              <div class="stat-value" id="pu-stat-umsatz-verloren">€ 0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <span class="card-title">Top-Produkte (Aktivierungen)</span>
+          </div>
+          <div id="pu-top-produkte"><p style="color:var(--gray);font-size:13px">Noch keine Produktdaten vorhanden.</p></div>
+        </div>
+
         <div class="card" style="margin-bottom:20px">
           <div class="card-header">
             <span class="card-title">Kündigungen</span>
@@ -2371,6 +2417,7 @@ async function createVertragsereignisseFromSelection(type) {
   document.getElementById(`ve-${type}-list`).innerHTML = '';
   document.getElementById(`ve-${type}-actions`).style.display = 'none';
   renderVertragsereignisTabelle(type);
+  renderProdukteUebersicht();
 }
 
 function renderVertragsereignisTabelle(type) {
@@ -2412,6 +2459,7 @@ async function deleteVertragsereignis(type, id) {
   if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
   vertragsereignisListen[type] = vertragsereignisListen[type].filter(x => x.id !== id);
   renderVertragsereignisTabelle(type);
+  renderProdukteUebersicht();
 }
 
 async function loadVertragsereignisse() {
@@ -2426,6 +2474,58 @@ async function loadVertragsereignisse() {
       vertragsereignisListen[type] = (data || []).map(r => ({ id: r.id, created_at: r.created_at, ...r.data }));
     }
     renderVertragsereignisTabelle(type);
+  }
+  renderProdukteUebersicht();
+}
+
+// ── Produkte-Übersicht (aggregiert über alle Vertragsereignisse) ──
+function parsePreisString(s) {
+  return parseFloat(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+function renderProdukteUebersicht() {
+  const statAkt = document.getElementById('pu-stat-aktiviert');
+  if (!statAkt) return; // Seite noch nicht im DOM (z.B. vor erstem Login)
+
+  const alle = [];
+  for (const type of Object.keys(VERTRAGSEREIGNIS_TYPES)) {
+    (vertragsereignisListen[type] || []).forEach(e => {
+      (e.produkte || []).forEach(p => alle.push({ ...p, ereignisTyp: type }));
+    });
+  }
+
+  const aktiviert = alle.filter(p => p.ereignisTyp === 'aktivierung');
+  const gekuendigt = alle.filter(p => p.ereignisTyp === 'kuendigung');
+  const summe = list => list.filter(p => p.typ === 'Monatlich')
+    .reduce((s, p) => s + parsePreisString(p.gesamtpreis || p.preisProArtikel), 0);
+  const fmtEuro = n => '€ ' + n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  statAkt.textContent = aktiviert.length;
+  document.getElementById('pu-stat-gekuendigt').textContent = gekuendigt.length;
+  document.getElementById('pu-stat-umsatz-neu').textContent = fmtEuro(summe(aktiviert));
+  document.getElementById('pu-stat-umsatz-verloren').textContent = fmtEuro(summe(gekuendigt));
+
+  const zaehler = {};
+  aktiviert.forEach(p => {
+    const key = p.dienst || 'Unbekannt';
+    zaehler[key] = (zaehler[key] || 0) + 1;
+  });
+  const sortiert = Object.entries(zaehler).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const max = sortiert.length ? sortiert[0][1] : 1;
+  const listEl = document.getElementById('pu-top-produkte');
+  if (!sortiert.length) {
+    listEl.innerHTML = `<p style="color:var(--gray);font-size:13px">Noch keine Produktdaten vorhanden.</p>`;
+  } else {
+    listEl.innerHTML = sortiert.map(([name, count]) => `
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">
+          <span>${esc(name)}</span>
+          <span style="color:var(--gray)">${count}×</span>
+        </div>
+        <div style="background:var(--gray-light);border-radius:6px;height:8px;overflow:hidden">
+          <div style="background:var(--blue-mid);width:${(count / max * 100).toFixed(0)}%;height:100%;border-radius:6px"></div>
+        </div>
+      </div>`).join('');
   }
 }
 
