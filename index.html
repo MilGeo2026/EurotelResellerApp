@@ -2130,14 +2130,18 @@ function parseWebfleetTarifAusPdfText(volltext) {
 // Spalten: Objekt-Nr. | Zugang | Vertrag | WEBFLEET Gerät | Seriennr. | Kündigung
 function parseKuendigungGeraeteAusPdfText(volltext) {
   if (!/Liste der Ger[aä]te/i.test(volltext)) return [];
+  // Reale PDF-Textreihenfolge weicht von der sichtbaren Tabelle ab: die Werte kommen
+  // VOR der Überschrift "Liste der Geräte"/Spaltenköpfen, und in der Reihenfolge
+  // <Gerät> <Seriennr.> <Kündigungsdatum> <Objekt-Nr.> <Zugang> <Vertrag>
+  // (nicht in der sichtbaren Spaltenreihenfolge Objekt-Nr./Zugang/Vertrag/Gerät/Seriennr./Kündigung).
   const produkte = [];
-  const regex = /([A-Z]{2}\d{2}-[\d-]+)\s+(.+?)\s+([A-Z]{2}\d{2}-\d+)\s+(.+?)\s+([A-Z0-9]{6,})\s+(\d{2}\.\d{2}\.\d{4})/g;
+  const regex = /(LINK|PRO)\s*(\d+[A-Z]?)\s+([A-Z0-9]{6,})\s+(\d{2}\.\d{2}\.\d{4})\s+([A-Z]{2}\d{2}-[\d-]+)\s+(\S+)\s+([A-Z]{2}\d{2}-\d+)/g;
   let match;
   while ((match = regex.exec(volltext)) !== null) {
     produkte.push({
-      dienst: `Gerät gekündigt: ${match[4].trim()} (Seriennr. ${match[5]})`,
+      dienst: `Gerät gekündigt: ${match[1]} ${match[2]} (Seriennr. ${match[3]})`,
       typ: 'Kündigung',
-      gueltigAb: match[6],
+      gueltigAb: match[4],
     });
   }
   return produkte;
