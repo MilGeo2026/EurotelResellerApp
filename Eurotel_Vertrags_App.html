@@ -1991,7 +1991,10 @@ async function extractPdfPageTexts(bytes) {
 // Tabelle "Kauf von zusätzlichen Diensten" (Zusatzdienste wie Direct FMS etc.)
 function parseZusatzdiensteAusPdfText(volltext) {
   if (!/Kauf von zus[aä]tzlichen Diensten/i.test(volltext)) return [];
-  const zeilenRegex = /(\d+)\s+(.+?)\s+(\S+)\s+(NAT|EU|INT)\s+(\d{2}\.\d{2}\.\d{2})\s+(Monatlich|Einmalig|J[aä]hrlich)\s+([\d.,]+)\s*€\s+([\d.,]+)\s*€/g;
+  // NAT/EU/INT ist nicht bei jedem Dienst gesetzt (z.B. reine Software-Dienste) -> optional.
+  // "Zugang / Objekt" kann durch Zeilenumbruch in der PDF ein eingebettetes Leerzeichen
+  // vor der Endziffernfolge haben (z.B. "DE01-212716- 0014") -> (\S+(?:\s+\d+)?).
+  const zeilenRegex = /(\d+)\s+(.+?)\s+(\S+(?:\s+\d+)?)\s+(?:(NAT|EU|INT)\s+)?(\d{2}\.\d{2}\.\d{2})\s+(Monatlich|Einmalig|J[aä]hrlich)\s+([\d.,]+)\s*€\s+([\d.,]+)\s*€/g;
   const produkte = [];
   let match;
   while ((match = zeilenRegex.exec(volltext)) !== null) {
@@ -2011,19 +2014,19 @@ function parseZusatzdiensteAusPdfText(volltext) {
 // gefolgt von "Geräte LINK 740 (+ PRO 8475 TRUCK)")
 function parseWebfleetTarifAusPdfText(volltext) {
   if (!/WEBFLEET-Tarif/i.test(volltext)) return [];
+  // Reale PDF-Textreihenfolge: "Tarifdetails Geräte  Vertragsobjekt <N>  <Tarifcode> <Anzahl> <Preis>€ <Dauer> <Gerät> <Gesamtpreis>€"
+  // ("Tarifdetails"/"Geräte" sind Zeilen-Label, die vor den Werten stehen, nicht direkt gefolgt vom Tarifcode).
   const produkte = [];
-  const tarifRegex = /Tarifdetails\s+(\S+)\s+(\d+)\s+([\d.,]+)\s*€\s+(\d+)\s+([\d.,]+)\s*€/g;
+  const tarifRegex = /Tarifdetails\s+Ger[aä]te\s+Vertragsobjekt\s+(\d+)\s+([A-Z]{2}-[A-Z0-9-]+)\s+(\d+)\s+([\d.,]+)\s*€\s+(\d+)\s+(.+?)\s+([\d.,]+)\s*€/g;
   let match;
   while ((match = tarifRegex.exec(volltext)) !== null) {
-    const rest = volltext.slice(match.index + match[0].length);
-    const geraeteMatch = rest.match(/^\s*Ger[aä]te\s+(.+?)(?=\s+(?:Gesamtpreis exklusive|Vertragsobjekt|Tarifdetails|$))/);
     produkte.push({
-      dienst: `WEBFLEET-Tarif ${match[1]}` + (geraeteMatch ? ` (${geraeteMatch[1].trim()})` : ''),
-      zugangObjekt: `${match[2]} Fahrzeug(e)`,
+      dienst: `WEBFLEET-Tarif ${match[2]} – Vertragsobjekt ${match[1]} (${match[6].trim()})`,
+      zugangObjekt: `${match[3]} Fahrzeug(e)`,
       typ: 'Monatlich',
-      preisProArtikel: match[3],
-      minVertragsdauer: match[4],
-      gesamtpreis: match[5],
+      preisProArtikel: match[4],
+      minVertragsdauer: match[5],
+      gesamtpreis: match[7],
     });
   }
   return produkte;
