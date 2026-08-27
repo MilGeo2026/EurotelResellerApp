@@ -2073,7 +2073,7 @@ function parseWebfleetTarifAusPdfText(volltext) {
     produkte.push({
       dienst: `${match[2]} (${match[6].trim()})`,
       typ: 'Monatlich',
-      gesamtpreis: match[7],
+      preisProArtikel: match[4],
     });
   }
   return produkte;
