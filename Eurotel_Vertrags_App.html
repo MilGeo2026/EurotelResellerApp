@@ -2071,11 +2071,8 @@ function parseWebfleetTarifAusPdfText(volltext) {
   let match;
   while ((match = tarifRegex.exec(volltext)) !== null) {
     produkte.push({
-      dienst: `WEBFLEET-Tarif ${match[2]} – Vertragsobjekt ${match[1]} (${match[6].trim()})`,
-      zugangObjekt: `${match[3]} Fahrzeug(e)`,
+      dienst: `${match[2]} (${match[6].trim()})`,
       typ: 'Monatlich',
-      preisProArtikel: match[4],
-      minVertragsdauer: match[5],
       gesamtpreis: match[7],
     });
   }
@@ -2400,7 +2397,8 @@ function produkteZusammenfassung(e) {
   if ((e.produkte||[]).length) {
     return e.produkte.map(p => {
       const preis = p.gesamtpreis || p.preisProArtikel;
-      return `${esc(p.dienst)}${preis ? ` <span style="color:var(--gray);font-size:11px">(${esc(preis)} €${p.typ ? '/' + esc(p.typ) : ''})</span>` : ''}`;
+      const einheit = p.typ === 'Monatlich' ? 'pro Monat' : (p.typ || '');
+      return `${esc(p.dienst)}${preis ? ` <span style="color:var(--gray);font-size:11px">(${esc(preis)} €${einheit ? ' ' + esc(einheit) : ''})</span>` : ''}`;
     }).join('<br>');
   }
   if (e.produktePdfRohtext) return '<span style="color:var(--orange);font-size:12px">PDF gefunden, Format nicht erkannt</span>';
