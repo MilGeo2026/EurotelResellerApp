@@ -2489,8 +2489,24 @@ function produkteZusammenfassung(e) {
       return `${esc(p.dienst)}${preis ? ` <span style="color:var(--gray);font-size:11px">(${esc(preis)} €${einheit ? ' ' + esc(einheit) : ''})</span>` : ''}`;
     }).join('<br>');
   }
-  if (e.produktePdfRohtext) return '<span style="color:var(--orange);font-size:12px">PDF gefunden, Format nicht erkannt</span>';
+  if (e.produktePdfRohtext) {
+    return `<span style="color:var(--orange);font-size:12px">PDF gefunden, Format nicht erkannt</span><br>
+      <button class="btn btn-secondary btn-sm" style="padding:2px 8px;font-size:11px;margin-top:4px" onclick="kopierePdfRohtext('${e.id}')">Rohtext kopieren</button>`;
+  }
   return '<span style="color:var(--gray)">–</span>';
+}
+
+function kopierePdfRohtext(id) {
+  let text = '';
+  for (const type of Object.keys(VERTRAGSEREIGNIS_TYPES)) {
+    const eintrag = (vertragsereignisListen[type] || []).find(x => x.id === id);
+    if (eintrag) { text = eintrag.produktePdfRohtext || ''; break; }
+  }
+  if (!text) { alert('Kein Rohtext vorhanden.'); return; }
+  navigator.clipboard.writeText(text).then(
+    () => alert('PDF-Rohtext wurde in die Zwischenablage kopiert. Bitte hier ins Chat mit Claude einfügen.'),
+    () => alert(text)
+  );
 }
 
 async function deleteVertragsereignis(type, id) {
