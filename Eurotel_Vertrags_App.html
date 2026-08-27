@@ -2101,6 +2101,7 @@ function parseZusatzdiensteAusPdfText(volltext) {
       typ: match[6],
       preisProArtikel: match[7],
       gesamtpreis: match[8],
+      kategorie: 'Feature',
     });
   }
   return produkte;
@@ -2120,6 +2121,7 @@ function parseWebfleetTarifAusPdfText(volltext) {
       dienst: `${match[2]} (${match[6].trim()})`,
       typ: 'Monatlich',
       preisProArtikel: match[4],
+      kategorie: 'Vertrag',
     });
   }
   return produkte;
@@ -2142,6 +2144,7 @@ function parseKuendigungGeraeteAusPdfText(volltext) {
       dienst: `Gerät gekündigt: ${match[1]} ${match[2]} (Seriennr. ${match[3]})`,
       typ: 'Kündigung',
       gueltigAb: match[4],
+      kategorie: 'Vertrag',
     });
   }
   return produkte;
@@ -2160,6 +2163,7 @@ function parseKuendigungFeaturesAusPdfText(volltext) {
       dienst: `Dienst gekündigt: ${match[4].trim()}`,
       typ: 'Kündigung',
       gueltigAb: match[6],
+      kategorie: 'Feature',
     });
   }
   return produkte;
@@ -2487,10 +2491,17 @@ function renderVertragsereignisTabelle(type) {
 
 function produkteZusammenfassung(e) {
   if ((e.produkte||[]).length) {
-    return e.produkte.map(p => {
+    const sortiert = [...e.produkte].sort((a, b) => (a.kategorie === 'Vertrag' ? 0 : 1) - (b.kategorie === 'Vertrag' ? 0 : 1));
+    return sortiert.map(p => {
       const preis = p.gesamtpreis || p.preisProArtikel;
       const einheit = p.typ === 'Monatlich' ? 'pro Monat' : (p.typ || '');
-      return `${esc(p.dienst)}${preis ? ` <span style="color:var(--gray);font-size:11px">(${esc(preis)} €${einheit ? ' ' + esc(einheit) : ''})</span>` : ''}`;
+      const badgeFarbe = p.kategorie === 'Vertrag'
+        ? 'background:var(--blue-light);color:var(--blue-mid)'
+        : 'background:var(--gray-light);color:var(--gray)';
+      const badge = p.kategorie
+        ? `<span style="${badgeFarbe};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;margin-right:5px">${esc(p.kategorie)}</span>`
+        : '';
+      return `${badge}${esc(p.dienst)}${preis ? ` <span style="color:var(--gray);font-size:11px">(${esc(preis)} €${einheit ? ' ' + esc(einheit) : ''})</span>` : ''}`;
     }).join('<br>');
   }
   if (e.produktePdfRohtext) {
