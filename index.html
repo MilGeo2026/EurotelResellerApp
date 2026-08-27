@@ -703,22 +703,28 @@
         <div class="card">
           <div class="card-header">
             <span class="card-title">Vertragsliste</span>
-            <div class="search-wrap">
-              <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
-              <input type="text" placeholder="Suchen …" oninput="renderVertraege(this.value)" style="width:220px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <button id="vertraege-bulk-delete-btn" class="btn btn-danger btn-sm" style="display:none" onclick="deleteSelectedVertraege()">
+                🗑 Ausgewählte löschen (<span id="vertraege-bulk-count">0</span>)
+              </button>
+              <div class="search-wrap">
+                <span class="search-icon"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></span>
+                <input type="text" placeholder="Suchen …" oninput="renderVertraege(this.value)" style="width:220px">
+              </div>
             </div>
           </div>
           <div class="table-wrap">
             <table class="table-fixed vertraege-table">
               <thead>
                 <tr>
-                  <th style="width:10%">Vertrag-Nr.</th>
-                  <th style="width:14%">Kunde</th>
-                  <th style="width:22%">Produkte</th>
-                  <th style="width:10%">Beginn</th>
-                  <th style="width:10%">Ende</th>
-                  <th style="width:11%">Status</th>
-                  <th style="width:10%">Wert/Jahr</th>
+                  <th style="width:4%"><input type="checkbox" id="vertraege-select-all-cb" onchange="toggleVertragSelectAll(this)" style="width:16px;flex:none;padding:0;border:none;background:none"></th>
+                  <th style="width:9%">Vertrag-Nr.</th>
+                  <th style="width:13%">Kunde</th>
+                  <th style="width:20%">Produkte</th>
+                  <th style="width:9%">Beginn</th>
+                  <th style="width:9%">Ende</th>
+                  <th style="width:10%">Status</th>
+                  <th style="width:9%">Wert/Jahr</th>
                   <th style="width:13%">Aktionen</th>
                 </tr>
               </thead>
@@ -1624,6 +1630,47 @@ async function deleteVertrag(id) {
   const { error } = await sb.from('vertraege').delete().eq('id', id);
   if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
   vertraege = vertraege.filter(v => v.id !== id);
+  selectedVertragIds.delete(id);
+  refreshAll();
+}
+
+// ── Mehrfachauswahl zum Löschen ──
+let selectedVertragIds = new Set();
+
+function toggleVertragSelect(cb, id) {
+  if (cb.checked) selectedVertragIds.add(id); else selectedVertragIds.delete(id);
+  updateVertragBulkActions();
+}
+
+function toggleVertragSelectAll(cb) {
+  document.querySelectorAll('.vertrag-select-cb').forEach(row => {
+    row.checked = cb.checked;
+    if (cb.checked) selectedVertragIds.add(row.dataset.id); else selectedVertragIds.delete(row.dataset.id);
+  });
+  updateVertragBulkActions();
+}
+
+function updateVertragBulkActions() {
+  const btn = document.getElementById('vertraege-bulk-delete-btn');
+  const countEl = document.getElementById('vertraege-bulk-count');
+  const selectAllCb = document.getElementById('vertraege-select-all-cb');
+  if (!btn) return;
+  btn.style.display = selectedVertragIds.size ? '' : 'none';
+  if (countEl) countEl.textContent = selectedVertragIds.size;
+  if (selectAllCb) {
+    const visible = Array.from(document.querySelectorAll('.vertrag-select-cb'));
+    selectAllCb.checked = visible.length > 0 && visible.every(row => selectedVertragIds.has(row.dataset.id));
+  }
+}
+
+async function deleteSelectedVertraege() {
+  const ids = Array.from(selectedVertragIds);
+  if (!ids.length) return;
+  if (!confirm(`${ids.length} Vertrag/Verträge wirklich löschen?`)) return;
+  const { error } = await sb.from('vertraege').delete().in('id', ids);
+  if (error) { alert('Fehler beim Löschen: ' + error.message); return; }
+  vertraege = vertraege.filter(v => !selectedVertragIds.has(v.id));
+  selectedVertragIds.clear();
   refreshAll();
 }
 
@@ -1638,9 +1685,10 @@ function renderVertraege(filter = '') {
     });
   }
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty">
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       <p>Noch keine Verträge angelegt.</p></div></td></tr>`;
+    updateVertragBulkActions();
     return;
   }
   tbody.innerHTML = list.map(v => {
@@ -1656,6 +1704,7 @@ function renderVertraege(filter = '') {
     const stLabel = {aktiv:'Aktiv', entwurf:'Entwurf', abgelaufen:'Abgelaufen'}[v.status]||v.status;
     const fmt = n => '€ ' + (n||0).toLocaleString('de-DE', {minimumFractionDigits:0});
     return `<tr>
+      <td data-label="Auswahl"><input type="checkbox" class="vertrag-select-cb" data-id="${v.id}" ${selectedVertragIds.has(v.id)?'checked':''} onchange="toggleVertragSelect(this, '${v.id}')" style="width:16px;flex:none;padding:0;border:none;background:none"></td>
       <td data-label="Vertrag-Nr."><strong>${esc(v.nr)}</strong></td>
       <td data-label="Kunde">${esc(firmaName)}</td>
       <td data-label="Produkte" style="font-size:12px">${pLabels.slice(0,3).map(l=>`<span style="background:var(--blue-light);color:var(--blue-mid);border-radius:4px;padding:1px 6px;margin:1px;display:inline-block">${esc(l)}</span>`).join('')}${pLabels.length>3?`<span style="color:var(--gray);font-size:11px"> +${pLabels.length-3}</span>`:''}</td>
@@ -1670,6 +1719,7 @@ function renderVertraege(filter = '') {
       </div></td>
     </tr>`;
   }).join('');
+  updateVertragBulkActions();
 }
 
 // ══════════════════════════════════════════════════
