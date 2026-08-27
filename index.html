@@ -2125,9 +2125,50 @@ function parseWebfleetTarifAusPdfText(volltext) {
   return produkte;
 }
 
+// Tabelle "Liste der Geräte" (Kündigung eines Geräts/Vertragsobjekts), z.B.:
+// "DE01-225662-0027 gerüstbau-fleck DE00-200060 LINK 740 MW1012I00229 31.08.2026"
+// Spalten: Objekt-Nr. | Zugang | Vertrag | WEBFLEET Gerät | Seriennr. | Kündigung
+function parseKuendigungGeraeteAusPdfText(volltext) {
+  if (!/Liste der Ger[aä]te/i.test(volltext)) return [];
+  const produkte = [];
+  const regex = /([A-Z]{2}\d{2}-[\d-]+)\s+(.+?)\s+([A-Z]{2}\d{2}-\d+)\s+(.+?)\s+([A-Z0-9]{6,})\s+(\d{2}\.\d{2}\.\d{4})/g;
+  let match;
+  while ((match = regex.exec(volltext)) !== null) {
+    produkte.push({
+      dienst: `Gerät gekündigt: ${match[4].trim()} (Seriennr. ${match[5]})`,
+      typ: 'Kündigung',
+      gueltigAb: match[6],
+    });
+  }
+  return produkte;
+}
+
+// Tabelle "Feature list" (Kündigung eines Zusatzdienstes), z.B.:
+// "225662-R-0016 DE01-225662-0027 MW1012I00229 TACHOMANAGER 10.09.2025 31.08.2026"
+// Spalten: Funktionsnr. | Objekt-Nr. | Seriennummer | Funktion | Gültig ab | Gültig bis
+function parseKuendigungFeaturesAusPdfText(volltext) {
+  if (!/Feature list/i.test(volltext)) return [];
+  const produkte = [];
+  const regex = /(\d+-[A-Z]-\d+)\s+([A-Z]{2}\d{2}-[\d-]+)\s+([A-Z0-9]{6,})\s+(.+?)\s+(\d{2}\.\d{2}\.\d{4})\s+(\d{2}\.\d{2}\.\d{4})/g;
+  let match;
+  while ((match = regex.exec(volltext)) !== null) {
+    produkte.push({
+      dienst: `Dienst gekündigt: ${match[4].trim()}`,
+      typ: 'Kündigung',
+      gueltigAb: match[6],
+    });
+  }
+  return produkte;
+}
+
 function parseWebfleetProdukteAusPdfText(seitenText) {
   const volltext = seitenText.join('\n');
-  return [...parseZusatzdiensteAusPdfText(volltext), ...parseWebfleetTarifAusPdfText(volltext)];
+  return [
+    ...parseZusatzdiensteAusPdfText(volltext),
+    ...parseWebfleetTarifAusPdfText(volltext),
+    ...parseKuendigungGeraeteAusPdfText(volltext),
+    ...parseKuendigungFeaturesAusPdfText(volltext),
+  ];
 }
 
 async function extractProduktePdfFromMail(mailId) {
@@ -2139,7 +2180,7 @@ async function extractProduktePdfFromMail(mailId) {
     if (!res.ok) return { produkte: [], produktePdfRohtext: '' };
     const json = await res.json();
     const pdf = (json.value || []).find(a =>
-      a['@odata.type'] === '#microsoft.graph.fileAttachment' && a.contentBytes && /^willkommen/i.test(a.name || ''));
+      a['@odata.type'] === '#microsoft.graph.fileAttachment' && a.contentBytes && /^(willkommen|k[uü]ndigung)/i.test(a.name || ''));
     if (!pdf) return { produkte: [], produktePdfRohtext: '' };
     const bytes = base64ToUint8Array(pdf.contentBytes);
     const seitenText = await extractPdfPageTexts(bytes);
