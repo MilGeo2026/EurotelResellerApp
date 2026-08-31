@@ -853,6 +853,7 @@
             <option>Hardware</option>
             <option>Software</option>
             <option>Support Webfleet Tickets</option>
+            <option>Sales Tickets</option>
             <option>Abrechnung</option>
             <option>Vertrag</option>
             <option>Sonstiges</option>
@@ -2243,10 +2244,12 @@ async function checkWebfleetMails(manual = true) {
     }
     const json = await res.json();
     // Kündigungen & Vertragsaktivierungen laufen ausschließlich über die
-    // "Vertragsereignisse"-Seite, hier also nicht mit anzeigen.
+    // "Vertragsereignisse"-Seite, hier also nicht mit anzeigen. Ansonsten nur
+    // Support- und Sales-Tickets aufnehmen, keine sonstige Webfleet-Korrespondenz.
     const vertragsereignisSubjects = Object.values(VERTRAGSEREIGNIS_TYPES).map(c => c.subjectMatch);
     const found = (json.value || [])
       .filter(m => !vertragsereignisSubjects.some(s => (m.subject || '').includes(s)))
+      .filter(m => !!parseWebfleetSupportMail(m) || isWebfleetSalesMail(m))
       .sort((a, b) => (b.receivedDateTime || '').localeCompare(a.receivedDateTime || ''));
     const existingIds = new Set(tickets.map(t => t.webfleetMailId).filter(Boolean));
     webfleetMailCandidates = found.filter(m => !existingIds.has(m.id) && !ignoredWebfleetMailIds.has(m.id));
@@ -2258,8 +2261,9 @@ async function checkWebfleetMails(manual = true) {
     listEl.innerHTML = webfleetMailCandidates.map((m, i) => {
       const support = parseWebfleetSupportMail(m);
       const kundeTreffer = matchKundeInText(m.subject);
-      const badges = support
-        ? `<span class="badge" style="margin-right:6px">Support Webfleet Tickets</span>${support.ticketnr ? `<span class="badge" style="margin-right:6px">Ticket-Nr. ${esc(support.ticketnr)}</span>` : ''}${kundeTreffer ? `<span class="badge">Kunde: ${esc(kundeTreffer.firma)}</span>` : ''}`
+      const kategorieBadge = support ? 'Support Webfleet Tickets' : (isWebfleetSalesMail(m) ? 'Sales Tickets' : '');
+      const badges = kategorieBadge
+        ? `<span class="badge" style="margin-right:6px">${esc(kategorieBadge)}</span>${support?.ticketnr ? `<span class="badge" style="margin-right:6px">Ticket-Nr. ${esc(support.ticketnr)}</span>` : ''}${kundeTreffer ? `<span class="badge">Kunde: ${esc(kundeTreffer.firma)}</span>` : ''}`
         : '';
       return `
       <label style="display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
@@ -2296,6 +2300,14 @@ function parseWebfleetSupportMail(m) {
   return { ticketnr, titel: titel || subject };
 }
 
+// Sales-Korrespondenz erkennen (z.B. sales.de@webfleet.com) – Kündigungen/
+// Vertragsbestätigungen sind hier schon vorher rausgefiltert, das deckt den Rest
+// (Preisänderungen, Vertragsübernahmen, Verlängerungsdatum-Änderungen o.ä.).
+function isWebfleetSalesMail(m) {
+  const senderEmail = (m.from?.emailAddress?.address || '').toLowerCase();
+  return /sales/i.test(senderEmail) && WEBFLEET_SENDER_DOMAINS.some(d => senderEmail.endsWith('@' + d));
+}
+
 // Kunde anhand Firma/Name im Betreff finden (nur wenn eindeutig ein Treffer).
 function matchKundeInText(text) {
   if (!text) return null;
@@ -2319,7 +2331,7 @@ async function createTicketsFromSelectedWebfleetMails() {
       titel: (support ? support.titel : m.subject) || 'Webfleet-E-Mail ohne Betreff',
       ticketnr: support ? support.ticketnr : '',
       kundeId: kundeTreffer ? kundeTreffer.id : null,
-      kategorie: support ? 'Support Webfleet Tickets' : 'Software',
+      kategorie: support ? 'Support Webfleet Tickets' : (isWebfleetSalesMail(m) ? 'Sales Tickets' : 'Software'),
       prioritaet: 'mittel',
       status: 'offen',
       beschreibung: (m.bodyPreview || '').trim() + `\n\n(Automatisch aus Webfleet-E-Mail importiert, Absender: ${senderEmail}, Eingang: ${m.receivedDateTime ? new Date(m.receivedDateTime).toLocaleString('de-DE') : '–'})`,
